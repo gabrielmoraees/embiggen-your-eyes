@@ -42,9 +42,9 @@ class ImageLayer(str, Enum):
     # Mars (NASA Trek)
     MARS_VIKING_COLOR = "Mars_Viking_MDIM21_ClrMosaic_global_232m"
     
-    # Moon (NASA Trek)  
-    MOON_LRO_WAC = "Moon_LRO_WAC_Mosaic_global_100m"
-    MOON_CLEMENTINE = "Moon_Clementine_UVVIS_750nm_Global_Mosaic_118m"
+    # Moon (Public tile services)
+    MOON_BASEMAP_OPM = "opm_moon_basemap"  # OpenPlanetaryMap
+    MOON_BASEMAP_ARCGIS = "arcgis_moon_basemap"  # ESRI ArcGIS
 
 class BoundingBox(BaseModel):
     north: float
@@ -153,13 +153,16 @@ def generate_tile_url_template(
             f"default/default028mm/{{z}}/{{y}}/{{x}}.jpg"
         )
     
-    # Moon - use NASA Trek
+    # Moon - use public tile services
     elif celestial_body == CelestialBody.MOON:
-        # NASA Trek WMTS format
-        return (
-            f"https://trek.nasa.gov/tiles/Moon/EQ/{layer}/1.0.0/"
-            f"default/default028mm/{{z}}/{{y}}/{{x}}.jpg"
-        )
+        if layer == "opm_moon_basemap":
+            # OpenPlanetaryMap Moon basemap
+            return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-moon-basemap-v0-1/all/{z}/{x}/{y}.png"
+        elif layer == "arcgis_moon_basemap":
+            # ESRI ArcGIS Moon basemap
+            return "https://tiles.arcgis.com/tiles/WQ9KVmV6xGGMnCiQ/arcgis/rest/services/Moon_Basemap/MapServer/tile/{z}/{y}/{x}"
+        else:
+            raise ValueError(f"Unknown Moon layer: {layer}")
     
     raise ValueError(f"Unsupported celestial body: {celestial_body}")
 
@@ -187,10 +190,12 @@ def generate_thumbnail_url(
             f"default/default028mm/0/0/0.jpg"
         )
     elif celestial_body == CelestialBody.MOON:
-        return (
-            f"https://trek.nasa.gov/tiles/Moon/EQ/{layer}/1.0.0/"
-            f"default/default028mm/0/0/0.jpg"
-        )
+        if layer == "opm_moon_basemap":
+            return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-moon-basemap-v0-1/all/0/0/0.png"
+        elif layer == "arcgis_moon_basemap":
+            return "https://tiles.arcgis.com/tiles/WQ9KVmV6xGGMnCiQ/arcgis/rest/services/Moon_Basemap/MapServer/tile/0/0/0"
+        else:
+            raise ValueError(f"Unknown Moon layer: {layer}")
     
     raise ValueError(f"Unsupported celestial body: {celestial_body}")
 
@@ -245,15 +250,16 @@ def get_available_layers(celestial_body: Optional[CelestialBody] = None):
             "type": "Colorized Mosaic (232m/px)"
         },
         # Moon layers
-        ImageLayer.MOON_LRO_WAC: {
+        ImageLayer.MOON_BASEMAP_OPM: {
             "celestial_body": CelestialBody.MOON,
-            "satellite": "LRO",
-            "type": "Wide Angle Camera"
+            "satellite": "OpenPlanetaryMap",
+            "type": "Lunar Basemap"
         },
-        ImageLayer.MOON_CLEMENTINE: {
+        ImageLayer.MOON_BASEMAP_ARCGIS: {
             "celestial_body": CelestialBody.MOON,
-            "satellite": "Clementine",
-            "type": "UV-VIS 750nm"
+            "satellite": "ESRI ArcGIS",
+            "type": "Lunar Basemap"
+        },
         }
     }
     
@@ -312,10 +318,10 @@ def search_images(query: ImageSearchQuery):
         max_zoom = 9  # GIBS supports up to zoom 9 for most layers
     elif query.celestial_body == CelestialBody.MARS:
         max_zoom = 12  # Mars high-res layers
-    else:  # Moon
+    elif query.celestial_body == CelestialBody.MOON:
         max_zoom = 10
     
-    # For Mars/Moon (static mosaics), only return one result since there's no time-series
+    # For Mars/Moon/Deep Space (static), only return one result since there's no time-series
     limit = 1 if query.celestial_body != CelestialBody.EARTH else query.limit
     
     while current_date <= date_end and count < limit:
@@ -333,7 +339,7 @@ def search_images(query: ImageSearchQuery):
             thumbnail_url=generate_thumbnail_url(query.celestial_body, query.layer.value, current_date, query.projection),
             projection=query.projection,
             max_zoom=max_zoom,
-            description=f"{query.celestial_body.value.title()} - {query.layer.value} imagery from {current_date}"
+            description=description
         ))
         
         # Skip to next week for Earth time-series
