@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>Embiggen Your Eyes - NASA Space Apps Challenge 2025</title>
     
     <!-- Leaflet CSS -->
@@ -10,56 +10,228 @@
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
           crossorigin=""/>
     
+    <!-- SF Symbols / System Icons Fallback -->
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&family=SF+Pro:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    
     <!-- Custom CSS -->
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Main Map Container -->
     <div id="map"></div>
     
-    <!-- Control Panel -->
-    <div id="control-panel">
-        <h2>Embiggen Your Eyes</h2>
-        <div class="control-section">
-            <h3>Layer Selection</h3>
-            <select id="layer-select">
-                <option value="VIIRS_SNPP_CorrectedReflectance_TrueColor" selected>VIIRS SNPP True Color</option>
-                <option value="VIIRS_SNPP_CorrectedReflectance_BandsM11-I2-I1">VIIRS SNPP False Color</option>
-                <option value="MODIS_Terra_CorrectedReflectance_TrueColor">MODIS Terra True Color</option>
-                <option value="MODIS_Terra_CorrectedReflectance_Bands721">MODIS Terra False Color</option>
-            </select>
-            <p style="font-size: 0.75rem; color: #666; margin-top: 4px;">
-                💡 Via Backend API
-            </p>
+    <!-- iOS-style Bottom Sheet Control Panel -->
+    <div id="control-sheet" class="bottom-sheet collapsed">
+        <div class="sheet-handle" id="sheet-handle">
+            <div class="handle-bar"></div>
         </div>
         
-        <div class="control-section">
-            <h3>Date</h3>
-            <p style="font-size: 0.8rem; color: #666; margin-bottom: 8px;">
-                📅 Using date from 3 days ago (GIBS has 24-48h delay)
-            </p>
-            <input type="date" id="date-picker" />
-            <button id="update-date">Update</button>
+        <div class="sheet-content">
+            <!-- Quick Actions Bar -->
+            <div class="quick-actions-bar">
+                <button class="action-btn" id="btn-bodies" title="Celestial Bodies">
+                    <span class="material-icons-round">public</span>
+                    <span class="action-label">Bodies</span>
+                </button>
+                <button class="action-btn" id="btn-layers" title="Layers">
+                    <span class="material-icons-round">layers</span>
+                    <span class="action-label">Layers</span>
+                </button>
+                <button class="action-btn" id="btn-overlay" title="Overlay Layers">
+                    <span class="material-icons-round">filter_none</span>
+                    <span class="action-label">Overlay</span>
+                </button>
+                <button class="action-btn" id="btn-compare" title="Compare">
+                    <span class="material-icons-round">compare</span>
+                    <span class="action-label">Compare</span>
+                </button>
+                <button class="action-btn" id="btn-collections" title="Collections">
+                    <span class="material-icons-round">collections</span>
+                    <span class="action-label">Sets</span>
+                </button>
+                <button class="action-btn" id="btn-tools" title="Tools">
+                    <span class="material-icons-round">draw</span>
+                    <span class="action-label">Tools</span>
+                </button>
+            </div>
+            
+            <!-- Dynamic Content Area -->
+            <div class="sheet-main" id="sheet-main">
+                <!-- Default: Bodies Selector -->
+                <div class="content-panel active" id="panel-bodies">
+                    <h3 class="panel-title">Explore</h3>
+                    <div class="body-grid">
+                        <div class="body-card" data-body="earth">
+                            <div class="body-icon">🌍</div>
+                            <div class="body-name">Earth</div>
+                            <div class="body-desc">Live imagery</div>
+                        </div>
+                        <div class="body-card" data-body="mars">
+                            <div class="body-icon">🔴</div>
+                            <div class="body-name">Mars</div>
+                            <div class="body-desc">Red Planet</div>
+                        </div>
+                        <div class="body-card" data-body="moon">
+                            <div class="body-icon">🌕</div>
+                            <div class="body-name">Moon</div>
+                            <div class="body-desc">Lunar surface</div>
+                        </div>
+                        <div class="body-card" data-body="mercury">
+                            <div class="body-icon">☿️</div>
+                            <div class="body-name">Mercury</div>
+                            <div class="body-desc">Innermost</div>
+                        </div>
+                        <div class="body-card" data-body="deep_space">
+                            <div class="body-icon">🌌</div>
+                            <div class="body-name">Deep Space</div>
+                            <div class="body-desc">Galaxies</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Layers Panel -->
+                <div class="content-panel" id="panel-layers">
+                    <h3 class="panel-title">Layers</h3>
+                    <div id="layers-list" class="layers-list"></div>
+                    <div class="date-picker-section" id="date-section">
+                        <label class="input-label">Date</label>
+                        <input type="date" id="date-picker" class="glass-input" />
+                    </div>
+                </div>
+                
+                <!-- Overlay Panel -->
+                <div class="content-panel" id="panel-overlay">
+                    <h3 class="panel-title">Layer Overlay</h3>
+                    <p class="panel-desc">Add multiple layers from the same celestial body</p>
+                    <div id="overlay-layers" class="overlay-layers">
+                        <!-- Base layer -->
+                        <div class="overlay-item base-layer">
+                            <span class="material-icons-round">layers</span>
+                            <div class="overlay-info">
+                                <div class="overlay-name">Base Layer</div>
+                                <div class="overlay-desc" id="base-layer-name">Select a layer</div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="glass-button" id="btn-add-overlay">
+                        <span class="material-icons-round">add</span>
+                        Add Overlay Layer
+                    </button>
+                </div>
+                
+                <!-- Compare Panel -->
+                <div class="content-panel" id="panel-compare">
+                    <h3 class="panel-title">Compare Images</h3>
+                    <div class="compare-modes">
+                        <button class="mode-btn active" data-mode="overlay">
+                            <span class="material-icons-round">filter_none</span>
+                            Overlay
+                        </button>
+                        <button class="mode-btn" data-mode="swipe">
+                            <span class="material-icons-round">compare</span>
+                            Swipe
+                        </button>
+                        <button class="mode-btn" data-mode="split">
+                            <span class="material-icons-round">view_column</span>
+                            Split
+                        </button>
+                    </div>
+                    <div id="compare-images-list" class="compare-list"></div>
+                </div>
+                
+                <!-- Collections Panel -->
+                <div class="content-panel" id="panel-collections">
+                    <h3 class="panel-title">Collections</h3>
+                    <button class="glass-button" id="btn-new-collection">
+                        <span class="material-icons-round">add</span>
+                        New Collection
+                    </button>
+                    <div id="collections-list" class="collections-list"></div>
+                </div>
+                
+                <!-- Tools Panel -->
+                <div class="content-panel" id="panel-tools">
+                    <h3 class="panel-title">Annotation Tools</h3>
+                    <div class="tools-grid">
+                        <button class="tool-btn" id="tool-marker">
+                            <span class="material-icons-round">place</span>
+                            <span>Marker</span>
+                        </button>
+                        <button class="tool-btn" id="tool-polygon">
+                            <span class="material-icons-round">pentagon</span>
+                            <span>Polygon</span>
+                        </button>
+                        <button class="tool-btn" id="tool-rectangle">
+                            <span class="material-icons-round">crop_square</span>
+                            <span>Rectangle</span>
+                        </button>
+                        <button class="tool-btn" id="tool-circle">
+                            <span class="material-icons-round">circle</span>
+                            <span>Circle</span>
+                        </button>
+                    </div>
+                    <div class="divider"></div>
+                    <div id="annotations-list" class="annotations-list"></div>
+                </div>
+            </div>
         </div>
-        
-        <div class="control-section">
-            <h3>Tools</h3>
-            <button id="add-marker">Add Marker</button>
-            <button id="clear-markers">Clear Markers</button>
-        </div>
-        
-        <div class="control-section">
-            <h3>Markers</h3>
-            <div id="marker-list"></div>
-        </div>
-        
-        <button id="toggle-panel" class="toggle-btn">◀</button>
     </div>
     
-    <!-- Info Display -->
-    <div id="info-display">
-        <span id="coordinates">Lat: 0.00°, Lon: 0.00°</span>
-        <span id="zoom-level">Zoom: 2</span>
-        <span id="loading-status" style="color: #FC3D21; font-weight: bold;">⏳ Loading tiles...</span>
+    <!-- Floating Top Bar -->
+    <div class="top-bar glass">
+        <div class="top-bar-left">
+            <h1 class="app-title">
+                <span class="material-icons-round">explore</span>
+                Embiggen Your Eyes
+            </h1>
+        </div>
+        <div class="top-bar-right">
+            <div class="status-pill" id="status-pill">
+                <div class="status-dot"></div>
+                <span id="status-text">Ready</span>
+            </div>
+            <button class="icon-btn glass" id="btn-suggestions" title="Smart Suggestions">
+                <span class="material-icons-round">auto_awesome</span>
+            </button>
+            <button class="icon-btn glass" id="btn-search" title="Search">
+                <span class="material-icons-round">search</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Floating Map Controls -->
+    <div class="map-controls">
+        <button class="map-btn glass" id="btn-zoom-in" title="Zoom In">
+            <span class="material-icons-round">add</span>
+        </button>
+        <button class="map-btn glass" id="btn-zoom-out" title="Zoom Out">
+            <span class="material-icons-round">remove</span>
+        </button>
+        <button class="map-btn glass" id="btn-locate" title="My Location">
+            <span class="material-icons-round">my_location</span>
+        </button>
+        <button class="map-btn glass" id="btn-fullscreen" title="Fullscreen">
+            <span class="material-icons-round">fullscreen</span>
+        </button>
+    </div>
+    
+    <!-- Info HUD -->
+    <div class="info-hud glass">
+        <div class="hud-item">
+            <span class="material-icons-round">location_on</span>
+            <span id="coordinates">0.00°, 0.00°</span>
+        </div>
+        <div class="hud-item">
+            <span class="material-icons-round">zoom_in</span>
+            <span id="zoom-level">Zoom: 2</span>
+        </div>
+    </div>
+    
+    <!-- Suggestions Popover -->
+    <div class="suggestions-popover glass hidden" id="suggestions-popover">
+        <h4 class="popover-title">Smart Suggestions</h4>
+        <div id="suggestions-list" class="suggestions-list"></div>
     </div>
     
     <!-- Leaflet JS -->
@@ -71,4 +243,3 @@
     <script src="app.js"></script>
 </body>
 </html>
-
