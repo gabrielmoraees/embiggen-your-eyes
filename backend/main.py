@@ -30,6 +30,7 @@ class CelestialBody(str, Enum):
     EARTH = "earth"
     MARS = "mars"
     MOON = "moon"
+    MERCURY = "mercury"
 
 class ImageLayer(str, Enum):
     """Available imagery layers for all celestial bodies"""
@@ -46,6 +47,9 @@ class ImageLayer(str, Enum):
     # Moon (Public tile services)
     MOON_BASEMAP_OPM = "opm_moon_basemap"  # OpenPlanetaryMap
     MOON_BASEMAP_ARCGIS = "arcgis_moon_basemap"  # ESRI ArcGIS
+    
+    # Mercury (OpenPlanetaryMap)
+    MERCURY_BASEMAP_OPM = "opm_mercury_basemap"
 
 class BoundingBox(BaseModel):
     north: float
@@ -169,6 +173,13 @@ def generate_tile_url_template(
         else:
             raise ValueError(f"Unknown Moon layer: {layer}")
     
+    # Mercury - OpenPlanetaryMap
+    elif celestial_body == CelestialBody.MERCURY:
+        if layer == "opm_mercury_basemap":
+            return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mercury-basemap-v0-1/all/{z}/{x}/{y}.png"
+        else:
+            raise ValueError(f"Unknown Mercury layer: {layer}")
+    
     raise ValueError(f"Unsupported celestial body: {celestial_body}")
 
 def generate_thumbnail_url(
@@ -206,6 +217,13 @@ def generate_thumbnail_url(
             return "https://tiles.arcgis.com/tiles/WQ9KVmV6xGGMnCiQ/arcgis/rest/services/Moon_Basemap/MapServer/tile/0/0/0"
         else:
             raise ValueError(f"Unknown Moon layer: {layer}")
+    
+    # Mercury - OpenPlanetaryMap
+    elif celestial_body == CelestialBody.MERCURY:
+        if layer == "opm_mercury_basemap":
+            return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mercury-basemap-v0-1/all/0/0/0.png"
+        else:
+            raise ValueError(f"Unknown Mercury layer: {layer}")
     
     raise ValueError(f"Unsupported celestial body: {celestial_body}")
 
@@ -275,6 +293,11 @@ def get_available_layers(celestial_body: Optional[CelestialBody] = None):
             "satellite": "ESRI ArcGIS",
             "type": "Lunar Basemap"
         },
+        # Mercury layers
+        ImageLayer.MERCURY_BASEMAP_OPM: {
+            "celestial_body": CelestialBody.MERCURY,
+            "satellite": "OpenPlanetaryMap",
+            "type": "Mercury Basemap (MESSENGER)"
         }
     }
     
@@ -335,10 +358,12 @@ def search_images(query: ImageSearchQuery):
         max_zoom = 12  # Mars high-res layers
     elif query.celestial_body == CelestialBody.MOON:
         max_zoom = 10
+    elif query.celestial_body == CelestialBody.MERCURY:
+        max_zoom = 10  # Mercury basemap
     else:
         max_zoom = 9
     
-    # For Mars/Moon/Deep Space (static), only return one result since there's no time-series
+    # For Mars/Moon/Mercury (static), only return one result since there's no time-series
     limit = 1 if query.celestial_body != CelestialBody.EARTH else query.limit
     
     while current_date <= date_end and count < limit:
