@@ -1,10 +1,16 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
+fastapi==0.115.0
+uvicorn[standard]==0.32.1
+pydantic==2.10.6
 python-dateutil==2.8.2
 urllib3<2.0  # Pin to v1.x for compatibility with macOS LibreSSL
 requests==2.31.0  # For downloading NASA images
 aiofiles==23.2.1  # Async file operations
+
+# Testing dependencies
+pytest==7.4.3
+pytest-cov==4.1.0
+httpx==0.25.2  # Required for TestClient
+
 # GDAL: Install separately - see installation guide below
 # macOS: brew install gdal
 # Linux: apt-get install gdal-bin python3-gdal  

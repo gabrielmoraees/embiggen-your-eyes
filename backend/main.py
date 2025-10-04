@@ -44,7 +44,6 @@ class CelestialBody(str, Enum):
     MARS = "mars"
     MOON = "moon"
     MERCURY = "mercury"
-    DEEP_SPACE = "deep_space"  # Pre-curated galaxies, nebulae, star clusters
     CUSTOM = "custom"  # User-uploaded custom gigapixel images
 
 class ImageLayer(str, Enum):
@@ -61,14 +60,10 @@ class ImageLayer(str, Enum):
     
     # Moon (Public tile services)
     MOON_BASEMAP_OPM = "opm_moon_basemap"  # OpenPlanetaryMap
-    MOON_BASEMAP_ARCGIS = "arcgis_moon_basemap"  # ESRI ArcGIS
+    MOON_USGS_GEOLOGIC = "moon_usgs_unified_geologic_map"  # USGS Unified Geologic Map
     
     # Mercury (OpenPlanetaryMap)
     MERCURY_BASEMAP_OPM = "opm_mercury_basemap"
-    
-    # Deep Space (Pre-tiled gigapixel images only)
-    GALAXY_ANDROMEDA_GIGAPIXEL = "andromeda_gigapixel"  # 1.5 GP pre-tiled
-    # Add more pre-tiled gigapixel layers here
     
     # Custom (dynamically added by users - no predefined layers)
 
@@ -142,28 +137,6 @@ links_db: Dict[str, ImageLink] = {}
 collections_db: Dict[str, Collection] = {}
 search_history: List[ImageSearchQuery] = []
 
-# Deep Space Objects Catalog (Pre-curated, Pre-tiled Only)
-# Curated collection of pre-tiled gigapixel images from galaxies, nebulae, and star clusters
-# All entries must have tile_url_template (instant access, no processing)
-# For images that need processing, use the Custom celestial body instead
-DEEP_SPACE_CATALOG = {
-    "andromeda_gigapixel": {
-        "name": "Andromeda Galaxy (M31) - 1.5 Gigapixel",
-        "type": "Spiral Galaxy",
-        "distance": "2.5 million light-years",
-        "telescope": "Hubble Space Telescope",
-        "tile_url_template": "https://tile{s}.gigapan.com/gigapans0/48492/tiles/{z}_{x}_{y}.jpg",
-        "tile_subdomains": ["0", "1", "2", "3"],
-        "max_zoom": 12,
-        "ra": 10.684,
-        "dec": 41.269,
-        "description": "1.5 gigapixel mosaic of our nearest major galactic neighbor",
-        "attribution": "NASA/ESA Hubble Space Telescope via Gigapan"
-    }
-    # Add more pre-tiled gigapixel images here
-    # For non-pre-tiled images, use the Custom celestial body
-}
-
 # Custom Images Catalog (User-uploaded)
 # Dynamically populated when users upload custom gigapixel images
 # All custom images are processed on-demand into tiles
@@ -215,9 +188,9 @@ def generate_tile_url_template(
         if layer == "opm_moon_basemap":
             # OpenPlanetaryMap Moon basemap
             return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-moon-basemap-v0-1/all/{z}/{x}/{y}.png"
-        elif layer == "arcgis_moon_basemap":
-            # ESRI ArcGIS Moon basemap
-            return "https://tiles.arcgis.com/tiles/WQ9KVmV6xGGMnCiQ/arcgis/rest/services/Moon_Basemap/MapServer/tile/{z}/{y}/{x}"
+        elif layer == "moon_usgs_unified_geologic_map":
+            # USGS Unified Geologic Map of the Moon
+            return "https://bm2ms.rsl.wustl.edu/arcgis/rest/services/moon_c0/moon_bm_usgs_Unified_Geologic_Map_p2_c0/MapServer/tile/{z}/{y}/{x}"
         else:
             raise ValueError(f"Unknown Moon layer: {layer}")
     
@@ -227,21 +200,6 @@ def generate_tile_url_template(
             return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mercury-basemap-v0-1/all/{z}/{x}/{y}.png"
         else:
             raise ValueError(f"Unknown Mercury layer: {layer}")
-    
-    # Deep Space - pre-curated galaxies and nebulae (pre-tiled only)
-    elif celestial_body == CelestialBody.DEEP_SPACE:
-        if layer not in DEEP_SPACE_CATALOG:
-            raise ValueError(f"Unknown deep space object: {layer}")
-        
-        obj = DEEP_SPACE_CATALOG[layer]
-        
-        # Deep Space only supports pre-tiled gigapixel images (instant access)
-        if "tile_url_template" in obj:
-            # Return the pre-existing tile URL template
-            # Note: {s} subdomain placeholder will be handled by frontend
-            return obj["tile_url_template"].replace("{s}", "0")  # Default to subdomain 0
-        else:
-            raise ValueError(f"Deep space object {layer} must be pre-tiled. Use custom celestial body for processing images.")
     
     # Custom - user-uploaded gigapixel images
     elif celestial_body == CelestialBody.CUSTOM:
@@ -292,8 +250,8 @@ def generate_thumbnail_url(
     elif celestial_body == CelestialBody.MOON:
         if layer == "opm_moon_basemap":
             return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-moon-basemap-v0-1/all/0/0/0.png"
-        elif layer == "arcgis_moon_basemap":
-            return "https://tiles.arcgis.com/tiles/WQ9KVmV6xGGMnCiQ/arcgis/rest/services/Moon_Basemap/MapServer/tile/0/0/0"
+        elif layer == "moon_usgs_unified_geologic_map":
+            return "https://bm2ms.rsl.wustl.edu/arcgis/rest/services/moon_c0/moon_bm_usgs_Unified_Geologic_Map_p2_c0/MapServer/tile/0/0/0"
         else:
             raise ValueError(f"Unknown Moon layer: {layer}")
     
@@ -303,20 +261,6 @@ def generate_thumbnail_url(
             return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mercury-basemap-v0-1/all/0/0/0.png"
         else:
             raise ValueError(f"Unknown Mercury layer: {layer}")
-    
-    # Deep Space - use tile at zoom 0 as thumbnail (pre-tiled only)
-    elif celestial_body == CelestialBody.DEEP_SPACE:
-        if layer not in DEEP_SPACE_CATALOG:
-            raise ValueError(f"Unknown deep space object: {layer}")
-        
-        obj = DEEP_SPACE_CATALOG[layer]
-        
-        # Deep Space only supports pre-tiled gigapixel images
-        if "tile_url_template" in obj:
-            # Use zoom 0 tile from pre-tiled source
-            return obj["tile_url_template"].replace("{s}", "0").replace("{z}", "0").replace("{x}", "0").replace("{y}", "0")
-        else:
-            raise ValueError(f"Deep space object {layer} must be pre-tiled. Use custom celestial body for processing images.")
     
     # Custom - user-uploaded images
     elif celestial_body == CelestialBody.CUSTOM:
@@ -354,80 +298,6 @@ def root():
 # TILE PROCESSING ENDPOINTS
 # ----------------------------------------------------------------------------
 
-@app.get("/api/tile-status/{layer}")
-def get_tile_status(layer: str):
-    """
-    Check if tiles are ready for a deep space object
-    Returns processing status: not_started, processing, completed, failed
-    
-    All deep space objects use tiles - no exceptions
-    """
-    if layer not in DEEP_SPACE_CATALOG:
-        raise HTTPException(status_code=404, detail="Layer not found")
-    
-    obj = DEEP_SPACE_CATALOG[layer]
-    image_url = obj["image_url"]
-    status = tile_processor.get_processing_status(image_url)
-    
-    return {
-        "layer": layer,
-        "status": status.get("status", "not_started"),
-        "tile_info": status if status.get("status") == "completed" else None
-    }
-
-@app.post("/api/process-tiles/{layer}")
-async def trigger_tile_processing(layer: str, background_tasks: BackgroundTasks):
-    """
-    Trigger tile processing for a deep space object
-    Processing happens in background
-    
-    Only works for custom images (not pre-tiled gigapixel images)
-    """
-    if layer not in DEEP_SPACE_CATALOG:
-        raise HTTPException(status_code=404, detail="Layer not found")
-    
-    obj = DEEP_SPACE_CATALOG[layer]
-    
-    # Check if it's a pre-tiled image
-    if "tile_url_template" in obj:
-        raise HTTPException(status_code=400, detail="This layer uses pre-tiled gigapixel images. No processing needed.")
-    
-    if "image_url" not in obj:
-        raise HTTPException(status_code=400, detail="Layer has no image URL to process")
-    
-    image_url = obj["image_url"]
-    
-    # Check if already processed or processing
-    if tile_processor.is_tiled(image_url):
-        return {
-            "message": "Tiles already exist",
-            "status": "completed",
-            "layer": layer
-        }
-    
-    status = tile_processor.get_processing_status(image_url)
-    if status.get("status") == "processing":
-        return {
-            "message": "Processing already in progress",
-            "status": "processing",
-            "layer": layer
-        }
-    
-    # Trigger background processing
-    def process_in_background():
-        try:
-            tile_processor.process_image(image_url, obj)
-        except Exception as e:
-            print(f"Tile processing failed for {layer}: {e}")
-    
-    background_tasks.add_task(process_in_background)
-    
-    return {
-        "message": "Tile processing started",
-        "status": "processing",
-        "layer": layer,
-        "check_status_url": f"/api/tile-status/{layer}"
-    }
 
 class CustomImageRequest(BaseModel):
     """Request to add a custom gigapixel image"""
@@ -446,8 +316,6 @@ async def add_custom_image(request: CustomImageRequest, background_tasks: Backgr
     """
     Add a custom gigapixel image from any URL
     The image will be downloaded and converted to tiles automatically
-    
-    Custom images are stored separately from pre-curated deep space objects
     """
     # Generate a unique layer ID
     layer_id = f"custom_{hashlib.md5(request.image_url.encode()).hexdigest()[:12]}"
@@ -543,22 +411,16 @@ def get_available_layers(celestial_body: Optional[CelestialBody] = None):
             "satellite": "OpenPlanetaryMap",
             "type": "Lunar Basemap"
         },
-        ImageLayer.MOON_BASEMAP_ARCGIS: {
+        ImageLayer.MOON_USGS_GEOLOGIC: {
             "celestial_body": CelestialBody.MOON,
-            "satellite": "ESRI ArcGIS",
-            "type": "Lunar Basemap"
+            "satellite": "USGS",
+            "type": "Unified Geologic Map"
         },
         # Mercury layers
         ImageLayer.MERCURY_BASEMAP_OPM: {
             "celestial_body": CelestialBody.MERCURY,
             "satellite": "OpenPlanetaryMap",
             "type": "Mercury Basemap (MESSENGER)"
-        },
-        # Deep Space layers (pre-tiled gigapixel only)
-        ImageLayer.GALAXY_ANDROMEDA_GIGAPIXEL: {
-            "celestial_body": CelestialBody.DEEP_SPACE,
-            "satellite": "Hubble Space Telescope via Gigapan",
-            "type": "1.5 Gigapixel Spiral Galaxy"
         }
     }
     
@@ -600,10 +462,6 @@ async def search_images(query: ImageSearchQuery, background_tasks: BackgroundTas
     """
     Search for NASA imagery based on criteria
     Returns metadata for matching images (tiles served by NASA GIBS or processed on-demand)
-    
-    For deep space objects with tiling enabled:
-    - If tiles exist: returns tile URL
-    - If tiles don't exist: triggers processing in background and returns placeholder
     """
     results = []
     
@@ -643,13 +501,6 @@ async def search_images(query: ImageSearchQuery, background_tasks: BackgroundTas
         max_zoom = 10
     elif query.celestial_body == CelestialBody.MERCURY:
         max_zoom = 10  # Mercury basemap
-    elif query.celestial_body == CelestialBody.DEEP_SPACE:
-        # Deep Space only has pre-tiled images with explicit max_zoom
-        if query.layer in DEEP_SPACE_CATALOG:
-            obj = DEEP_SPACE_CATALOG[query.layer]
-            max_zoom = obj.get("max_zoom", 12)  # Default to 12 for gigapixel
-        else:
-            max_zoom = 12
     elif query.celestial_body == CelestialBody.CUSTOM:
         # Custom images - check processing status
         if query.layer in CUSTOM_IMAGES_CATALOG:
@@ -675,10 +526,7 @@ async def search_images(query: ImageSearchQuery, background_tasks: BackgroundTas
         bbox = query.bbox or BoundingBox(north=90, south=-90, east=180, west=-180)
         
         # Generate description with rich metadata
-        if query.celestial_body == CelestialBody.DEEP_SPACE and query.layer in DEEP_SPACE_CATALOG:
-            obj = DEEP_SPACE_CATALOG[query.layer]
-            description = f"{obj['name']} - {obj['type']}, {obj['distance']} away. Captured by {obj['telescope']}. {obj['description']}"
-        elif query.celestial_body == CelestialBody.CUSTOM and query.layer in CUSTOM_IMAGES_CATALOG:
+        if query.celestial_body == CelestialBody.CUSTOM and query.layer in CUSTOM_IMAGES_CATALOG:
             obj = CUSTOM_IMAGES_CATALOG[query.layer]
             description = f"{obj['name']} - {obj['type']}. {obj['description']}"
         else:
