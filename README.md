@@ -54,7 +54,7 @@ This platform enables users to:
 
 ## 🚀 Quick Start
 
-### Backend (MVP - Ready to Use)
+### Backend (Ready to Use ✅)
 
 ```bash
 cd backend
@@ -79,21 +79,35 @@ open http://localhost:8000/docs
 
 📖 **Full API documentation**: See [backend/README.md](backend/README.md)
 
-### Frontend (To Be Built)
+### Frontend (Integrated with Backend ✅)
 
 ```bash
 cd frontend
 
-# Recommended stack:
-# - React/Vue/Svelte
-# - Leaflet or OpenLayers
-# - Tailwind CSS
-# - Axios for API calls
+# Start HTTP server (choose one)
+./start.sh
+# or
+python3 -m http.server 8080
+# or
+npx http-server -p 8080
 
-# Example with React:
-npx create-react-app .
-npm install leaflet react-leaflet axios
+# Open browser
+open http://localhost:8080
 ```
+
+**Frontend Features:**
+- ✅ Backend API integration
+- ✅ Image search via backend
+- ✅ Persistent annotations (saved to backend)
+- ✅ Interactive map with Leaflet
+- ✅ Layer selection (4 NASA GIBS layers)
+- ✅ Date picker
+- ✅ Marker tools
+- 🚧 Collections (backend ready, UI pending)
+- 🚧 Image linking (backend ready, UI pending)
+- 🚧 Smart suggestions (backend ready, UI pending)
+
+📖 **Integration docs**: See [INTEGRATION_COMPLETE.md](INTEGRATION_COMPLETE.md)
 
 ## 💡 Key Features Explained
 
@@ -251,9 +265,22 @@ More layers: https://worldview.earthdata.nasa.gov/
 
 ## 📚 Documentation
 
+### Getting Started
+- **[Quick Start Guide](QUICKSTART.md)** - Get running in 3 minutes
+- **[Integration Complete](INTEGRATION_COMPLETE.md)** - What's new in the integrated system
+
+### Backend Documentation
 - **[Backend API Documentation](backend/README.md)** - Full API reference
 - **[Architecture Guide](backend/ARCHITECTURE.md)** - System design deep dive
 - **[API Quick Start](backend/API_QUICKSTART.md)** - Usage examples and patterns
+
+### Frontend Documentation
+- **[Backend Integration Guide](frontend/BACKEND_INTEGRATION.md)** - How frontend uses backend API
+- **[Advanced Features TODO](frontend/TODO_ADVANCED_FEATURES.md)** - Implementation guides
+- **[Data Flow Documentation](DATA_FLOW.md)** - Visual data flow diagrams
+
+### Other
+- **[Integration Summary](INTEGRATION_SUMMARY.md)** - Complete overview of integration
 
 ## 🚀 Development Workflow
 
