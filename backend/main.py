@@ -149,6 +149,48 @@ def root():
     }
 
 # ----------------------------------------------------------------------------
+@app.get("/api/layers")
+def get_available_layers():
+    """
+    Get list of available NASA GIBS layers
+    Returns layer information including name, value, and description
+    """
+    layers = []
+    for layer in ImageLayer:
+        # Parse layer info from enum
+        name = layer.name.replace('_', ' ').title()
+        
+        # Determine layer type and satellite
+        if 'VIIRS' in layer.value:
+            satellite = 'VIIRS SNPP'
+        elif 'MODIS_Terra' in layer.value:
+            satellite = 'MODIS Terra'
+        elif 'MODIS_Aqua' in layer.value:
+            satellite = 'MODIS Aqua'
+        else:
+            satellite = 'Unknown'
+        
+        if 'TrueColor' in layer.value:
+            layer_type = 'True Color (Natural)'
+        elif 'Bands' in layer.value:
+            layer_type = 'False Color (Enhanced)'
+        else:
+            layer_type = 'Unknown'
+        
+        layers.append({
+            "id": layer.name,
+            "value": layer.value,
+            "display_name": name,
+            "satellite": satellite,
+            "type": layer_type,
+            "description": f"{satellite} - {layer_type}"
+        })
+    
+    return {
+        "layers": layers,
+        "total": len(layers)
+    }
+
 # SEARCH & DISCOVERY
 # ----------------------------------------------------------------------------
 
