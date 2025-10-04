@@ -39,8 +39,9 @@ class ImageLayer(str, Enum):
     MODIS_TERRA_TRUE_COLOR = "MODIS_Terra_CorrectedReflectance_TrueColor"
     MODIS_TERRA_FALSE_COLOR = "MODIS_Terra_CorrectedReflectance_Bands721"
     
-    # Mars (NASA Trek)
-    MARS_VIKING_COLOR = "Mars_Viking_MDIM21_ClrMosaic_global_232m"
+    # Mars (Multiple sources)
+    MARS_VIKING_COLOR = "Mars_Viking_MDIM21_ClrMosaic_global_232m"  # NASA Trek
+    MARS_BASEMAP_OPM = "opm_mars_basemap"  # OpenPlanetaryMap
     
     # Moon (Public tile services)
     MOON_BASEMAP_OPM = "opm_moon_basemap"  # OpenPlanetaryMap
@@ -145,13 +146,17 @@ def generate_tile_url_template(
             f"{layer}/default/{date_str}/{tile_matrix}/{{z}}/{{y}}/{{x}}.jpg"
         )
     
-    # Mars - use NASA Trek
+    # Mars - multiple sources
     elif celestial_body == CelestialBody.MARS:
-        # NASA Trek WMTS format
-        return (
-            f"https://trek.nasa.gov/tiles/Mars/EQ/{layer}/1.0.0/"
-            f"default/default028mm/{{z}}/{{y}}/{{x}}.jpg"
-        )
+        if layer == "opm_mars_basemap":
+            # OpenPlanetaryMap Mars basemap
+            return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mars-basemap-v0-2/all/{z}/{x}/{y}.png"
+        else:
+            # NASA Trek WMTS format (Viking)
+            return (
+                f"https://trek.nasa.gov/tiles/Mars/EQ/{layer}/1.0.0/"
+                f"default/default028mm/{{z}}/{{y}}/{{x}}.jpg"
+            )
     
     # Moon - use public tile services
     elif celestial_body == CelestialBody.MOON:
@@ -183,12 +188,17 @@ def generate_thumbnail_url(
             f"{layer}/default/{date_str}/{tile_matrix}/0/0/0.jpg"
         )
     
-    # Mars/Moon - use Trek
+    # Mars - multiple sources
     elif celestial_body == CelestialBody.MARS:
-        return (
-            f"https://trek.nasa.gov/tiles/Mars/EQ/{layer}/1.0.0/"
-            f"default/default028mm/0/0/0.jpg"
-        )
+        if layer == "opm_mars_basemap":
+            return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mars-basemap-v0-2/all/0/0/0.png"
+        else:
+            return (
+                f"https://trek.nasa.gov/tiles/Mars/EQ/{layer}/1.0.0/"
+                f"default/default028mm/0/0/0.jpg"
+            )
+    
+    # Moon - public tile services
     elif celestial_body == CelestialBody.MOON:
         if layer == "opm_moon_basemap":
             return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-moon-basemap-v0-1/all/0/0/0.png"
@@ -246,8 +256,13 @@ def get_available_layers(celestial_body: Optional[CelestialBody] = None):
         # Mars layers
         ImageLayer.MARS_VIKING_COLOR: {
             "celestial_body": CelestialBody.MARS,
-            "satellite": "Viking Orbiter",
+            "satellite": "Viking Orbiter (Trek)",
             "type": "Colorized Mosaic (232m/px)"
+        },
+        ImageLayer.MARS_BASEMAP_OPM: {
+            "celestial_body": CelestialBody.MARS,
+            "satellite": "OpenPlanetaryMap",
+            "type": "Mars Basemap"
         },
         # Moon layers
         ImageLayer.MOON_BASEMAP_OPM: {
@@ -320,6 +335,8 @@ def search_images(query: ImageSearchQuery):
         max_zoom = 12  # Mars high-res layers
     elif query.celestial_body == CelestialBody.MOON:
         max_zoom = 10
+    else:
+        max_zoom = 9
     
     # For Mars/Moon/Deep Space (static), only return one result since there's no time-series
     limit = 1 if query.celestial_body != CelestialBody.EARTH else query.limit
@@ -329,6 +346,9 @@ def search_images(query: ImageSearchQuery):
         
         # Default bbox (global view)
         bbox = query.bbox or BoundingBox(north=90, south=-90, east=180, west=-180)
+        
+        # Generate description
+        description = f"{query.celestial_body.value.title()} - {query.layer.value} imagery from {current_date}"
         
         results.append(ImageMetadata(
             id=image_id,
