@@ -10,7 +10,7 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from main import app, annotations_db, links_db, collections_db, search_history
+from main import app, annotations_db, links_db, collections_db, views_db
 
 
 @pytest.fixture(scope="function")
@@ -23,7 +23,7 @@ def client() -> Generator[TestClient, None, None]:
     annotations_db.clear()
     links_db.clear()
     collections_db.clear()
-    search_history.clear()
+    views_db.clear()
     
     with TestClient(app) as test_client:
         yield test_client
@@ -33,7 +33,7 @@ def client() -> Generator[TestClient, None, None]:
 def sample_annotation_data():
     """Sample annotation data for testing"""
     return {
-        "image_id": "test_image_123",
+        "map_view_id": "test_view_123",
         "type": "point",
         "coordinates": [{"lat": 40.7128, "lng": -74.0060}],
         "text": "New York City",
@@ -45,8 +45,8 @@ def sample_annotation_data():
 def sample_link_data():
     """Sample link data for testing"""
     return {
-        "source_image_id": "image_001",
-        "target_image_id": "image_002",
+        "source_view_id": "view_001",
+        "target_view_id": "view_002",
         "relationship_type": "before_after",
         "description": "Hurricane comparison"
     }
@@ -58,40 +58,20 @@ def sample_collection_data():
     return {
         "name": "Test Collection",
         "description": "A test collection",
-        "image_ids": ["image_001", "image_002", "image_003"]
+        "view_ids": ["view_001", "view_002", "view_003"]
     }
 
 
 @pytest.fixture(scope="function")
-def sample_earth_search_query():
-    """Sample Earth image search query"""
+def sample_map_view_data():
+    """Sample map view data for testing"""
     return {
-        "celestial_body": "earth",
-        "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
-        "date_start": "2024-08-15",
-        "date_end": "2024-08-15",
-        "projection": "epsg3857",
-        "limit": 1
-    }
-
-
-@pytest.fixture(scope="function")
-def sample_mars_search_query():
-    """Sample Mars image search query"""
-    return {
-        "celestial_body": "mars",
-        "layer": "opm_mars_basemap"
-    }
-
-
-
-
-@pytest.fixture(scope="function")
-def sample_custom_image_data():
-    """Sample custom image upload data"""
-    return {
-        "name": "Test Custom Image",
-        "image_url": "https://images-assets.nasa.gov/image/PIA16695/PIA16695~orig.jpg",
-        "description": "Test image for pytest",
-        "max_zoom": 8
+        "name": "Test Dataset View",
+        "description": "A test view of Earth",
+        "dataset_id": "viirs_snpp",
+        "variant_id": "true_color",
+        "selected_date": "2025-10-04",
+        "center_lat": 40.7128,
+        "center_lng": -74.0060,
+        "zoom_level": 8
     }

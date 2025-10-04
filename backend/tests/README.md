@@ -6,14 +6,13 @@ Comprehensive test suite organized by test type following Python testing best pr
 
 ```
 tests/
-├── conftest.py              # Pytest fixtures and configuration
-├── unit/                    # Unit tests
-│   ├── test_models.py       # Data model validation tests
-│   └── test_helpers.py      # Helper function tests
-├── integration/             # Integration tests
-│   └── test_api_endpoints.py # API endpoint tests
-└── e2e/                     # End-to-end tests
-    └── test_user_workflows.py # Complete user workflow tests
+├── conftest.py                    # Pytest fixtures and configuration
+├── unit/                          # Unit tests
+│   └── test_models.py             # Data model validation tests
+├── integration/                   # Integration tests
+│   └── test_api_endpoints.py     # API endpoint tests
+└── e2e/                           # End-to-end tests
+    └── test_frontend_workflows.py # Complete user workflow tests
 ```
 
 ## Test Categories
@@ -98,10 +97,7 @@ Common fixtures are defined in `conftest.py`:
 - `sample_annotation_data`: Sample annotation for testing
 - `sample_link_data`: Sample image link for testing
 - `sample_collection_data`: Sample collection for testing
-- `sample_earth_search_query`: Sample Earth search query
-- `sample_mars_search_query`: Sample Mars search query
-- `sample_deep_space_search_query`: Sample deep space query
-- `sample_custom_image_data`: Sample custom image upload data
+- `sample_map_view_data`: Sample map view for testing
 
 ## Writing New Tests
 
@@ -176,17 +172,12 @@ Ensure you're in the backend directory and have installed dependencies.
 ### Database State Issues
 Tests use in-memory storage that's cleared between tests via fixtures.
 
-## Migration from Old Tests
+## Test Organization Benefits
 
-Old test files have been consolidated:
-- `test_complete_system.py` → Integrated into new structure
-- `test_gigapixel_system.py` → Integrated into new structure
-- `test_tile_urls.py` → Integrated into unit/integration tests
-- Shell scripts → Converted to pytest tests
-
-The new structure provides:
-- Better organization
-- Reusable fixtures
+The test suite provides:
+- Clear organization by test type
+- Reusable fixtures for common test data
 - Proper test isolation
 - Standard Python testing practices
 - CI/CD compatibility
+- Comprehensive coverage of all API features

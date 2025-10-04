@@ -1,110 +1,197 @@
 """
-Embiggen Your Eyes - MVP Backend
-Simple FastAPI backend for NASA imagery visualization and annotation
+Embiggen Your Eyes - Backend API
+FastAPI backend for NASA imagery visualization with hierarchical data model
 """
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
 from enum import Enum
 from pathlib import Path
 import uuid
-import asyncio
-import hashlib
 
 # Import tile processor
 from tile_processor import tile_processor
 
-app = FastAPI(title="Embiggen Your Eyes API", version="0.1.0")
+app = FastAPI(title="Embiggen Your Eyes API", version="1.0.0")
 
 # Mount static tiles directory
 tiles_cache_path = Path("./tiles_cache")
 tiles_cache_path.mkdir(exist_ok=True)
 app.mount("/tiles", StaticFiles(directory=str(tiles_cache_path)), name="tiles")
 
-# CORS middleware for frontend communication
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend URL
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ============================================================================
-# DATA MODELS
+# ENUMS
 # ============================================================================
 
-class CelestialBody(str, Enum):
-    """Available celestial bodies"""
+class Category(str, Enum):
+    """High-level astronomical object categories"""
+    PLANETS = "planets"
+    MOONS = "moons"
+    DWARF_PLANETS = "dwarf_planets"
+    GALAXIES = "galaxies"
+    NEBULAE = "nebulae"
+    STAR_CLUSTERS = "star_clusters"
+    PHENOMENA = "phenomena"
+    REGIONS = "regions"
+    CUSTOM = "custom"
+
+class Subject(str, Enum):
+    """Specific astronomical objects or subjects"""
+    # Planets
     EARTH = "earth"
     MARS = "mars"
-    MOON = "moon"
     MERCURY = "mercury"
-    CUSTOM = "custom"  # User-uploaded custom gigapixel images
-
-class ImageLayer(str, Enum):
-    """Available imagery layers for all celestial bodies"""
-    # Earth (NASA GIBS)
-    VIIRS_TRUE_COLOR = "VIIRS_SNPP_CorrectedReflectance_TrueColor"
-    VIIRS_FALSE_COLOR = "VIIRS_SNPP_CorrectedReflectance_BandsM11-I2-I1"
-    MODIS_TERRA_TRUE_COLOR = "MODIS_Terra_CorrectedReflectance_TrueColor"
-    MODIS_TERRA_FALSE_COLOR = "MODIS_Terra_CorrectedReflectance_Bands721"
+    VENUS = "venus"
+    JUPITER = "jupiter"
+    SATURN = "saturn"
+    URANUS = "uranus"
+    NEPTUNE = "neptune"
     
-    # Mars (Multiple sources)
-    MARS_VIKING_COLOR = "Mars_Viking_MDIM21_ClrMosaic_global_232m"  # NASA Trek
-    MARS_BASEMAP_OPM = "opm_mars_basemap"  # OpenPlanetaryMap
+    # Moons
+    MOON = "moon"  # Earth's moon
+    EUROPA = "europa"
+    TITAN = "titan"
+    ENCELADUS = "enceladus"
     
-    # Moon (Public tile services)
-    MOON_BASEMAP_OPM = "opm_moon_basemap"  # OpenPlanetaryMap
-    MOON_USGS_GEOLOGIC = "moon_usgs_unified_geologic_map"  # USGS Unified Geologic Map
+    # Galaxies
+    MILKY_WAY = "milky_way"
+    ANDROMEDA = "andromeda"
     
-    # Mercury (OpenPlanetaryMap)
-    MERCURY_BASEMAP_OPM = "opm_mercury_basemap"
-    
-    # Custom (dynamically added by users - no predefined layers)
+    # Custom
+    CUSTOM = "custom"
 
-class BoundingBox(BaseModel):
-    north: float
-    south: float
-    east: float
-    west: float
+class SourceId(str, Enum):
+    """Map data providers"""
+    NASA_GIBS = "nasa_gibs"
+    NASA_TREK = "nasa_trek"
+    OPENPLANETARYMAP = "openplanetarymap"
+    USGS = "usgs"
+    CUSTOM = "custom"
 
-class ImageSearchQuery(BaseModel):
-    celestial_body: CelestialBody = CelestialBody.EARTH
-    layer: Optional[str] = None  # Can be ImageLayer enum value or custom layer ID
-    date_start: Optional[date] = None
-    date_end: Optional[date] = None
-    bbox: Optional[BoundingBox] = None
-    projection: str = "epsg3857"  # epsg3857 (Web Mercator) or epsg4326 (Geographic)
-    limit: int = 50
-
-class ImageMetadata(BaseModel):
-    id: str
-    layer: str
-    date: date
-    bbox: BoundingBox
-    tile_url: str  # Template URL with {z}/{x}/{y} placeholders
-    thumbnail_url: str
-    projection: str = "epsg3857"
-    max_zoom: int = 9
-    description: Optional[str] = None
+class ProjectionType(str, Enum):
+    """Supported map projections"""
+    WEB_MERCATOR = "epsg3857"
+    GEOGRAPHIC = "epsg4326"
 
 class AnnotationType(str, Enum):
+    """Annotation types"""
     POINT = "point"
     POLYGON = "polygon"
     RECTANGLE = "rectangle"
     CIRCLE = "circle"
     TEXT = "text"
 
+# ============================================================================
+# CORE DATA MODELS
+# ============================================================================
+
+class Source(BaseModel):
+    """Data provider (NASA GIBS, OpenPlanetaryMap, etc.)"""
+    id: SourceId
+    name: str
+    description: str
+    attribution: str
+    url: Optional[str] = None
+    terms_of_use: Optional[str] = None
+
+class Layer(BaseModel):
+    """Overlayable data layer (labels, borders, elevation, etc.)"""
+    id: str
+    name: str
+    description: str
+    tile_url_template: str
+    thumbnail_url: Optional[str] = None
+    opacity: float = Field(default=1.0, ge=0.0, le=1.0)
+    blend_mode: str = "normal"  # normal, multiply, overlay, etc.
+    min_zoom: int = 0
+    max_zoom: int = 18
+    enabled_by_default: bool = False
+
+class Variant(BaseModel):
+    """Visualization variant of a map (true color, false color, etc.)"""
+    id: str
+    name: str
+    description: str
+    tile_url_template: str
+    thumbnail_url: str
+    min_zoom: int = 0
+    max_zoom: int = 18
+    is_default: bool = False
+
+class Dataset(BaseModel):
+    """A specific dataset/map product from a source"""
+    id: str
+    name: str
+    description: str
+    source_id: SourceId
+    category: Category  # High-level: Planets, Moons, Galaxies, etc.
+    subject: Subject    # Specific: Earth, Mars, Andromeda, etc.
+    projection: ProjectionType = ProjectionType.WEB_MERCATOR
+    supports_time_series: bool = False
+    date_range_start: Optional[date] = None
+    date_range_end: Optional[date] = None
+    default_date: Optional[date] = None
+    variants: List[Variant] = []
+    available_layers: List[str] = []  # Layer IDs that can be overlaid
+    bbox: Optional[Dict[str, float]] = None  # Geographic extent
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+class View(BaseModel):
+    """User-saved map configuration"""
+    id: Optional[str] = None
+    name: str
+    description: Optional[str] = None
+    dataset_id: str
+    variant_id: str
+    active_layers: List[str] = []  # Layer IDs
+    selected_date: Optional[date] = None
+    center_lat: float = 0.0
+    center_lng: float = 0.0
+    zoom_level: int = 3
+    annotation_ids: List[str] = []
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class BoundingBox(BaseModel):
+    """Geographic bounding box"""
+    north: float
+    south: float
+    east: float
+    west: float
+
+class DatasetSearchQuery(BaseModel):
+    """Search criteria for datasets"""
+    category: Optional[Category] = None
+    subject: Optional[Subject] = None
+    source_id: Optional[SourceId] = None
+    supports_time_series: Optional[bool] = None
+    date: Optional[date] = None
+    bbox: Optional[BoundingBox] = None
+    limit: int = 50
+
+# ============================================================================
+# ANNOTATION MODELS
+# ============================================================================
+
 class Annotation(BaseModel):
     id: Optional[str] = None
-    image_id: str
+    map_view_id: Optional[str] = None  # Link to View
     type: AnnotationType
-    coordinates: List[Dict[str, float]]  # [{"lat": x, "lng": y}, ...]
+    coordinates: List[Dict[str, float]]
     properties: Dict[str, Any] = {}
     text: Optional[str] = None
     color: str = "#FF0000"
@@ -112,494 +199,509 @@ class Annotation(BaseModel):
     updated_at: Optional[datetime] = None
 
 class ImageLink(BaseModel):
+    """Link between map views"""
     id: Optional[str] = None
-    source_image_id: str
-    target_image_id: str
+    source_view_id: str
+    target_view_id: str
     annotation_id: Optional[str] = None
-    relationship_type: str  # e.g., "before_after", "same_location", "related_event"
+    relationship_type: str
     description: Optional[str] = None
     created_at: Optional[datetime] = None
 
 class Collection(BaseModel):
+    """Collection of map views"""
     id: Optional[str] = None
     name: str
     description: Optional[str] = None
-    image_ids: List[str] = []
+    view_ids: List[str] = []
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
 # ============================================================================
-# IN-MEMORY STORAGE (for MVP - replace with DB in production)
+# IN-MEMORY STORAGE
 # ============================================================================
 
+# Catalogs
+SOURCES: Dict[str, Source] = {}
+DATASETS: Dict[str, Dataset] = {}
+LAYERS: Dict[str, Layer] = {}
+
+# User data
+views_db: Dict[str, View] = {}
 annotations_db: Dict[str, Annotation] = {}
 links_db: Dict[str, ImageLink] = {}
 collections_db: Dict[str, Collection] = {}
-search_history: List[ImageSearchQuery] = []
-
-# Custom Images Catalog (User-uploaded)
-# Dynamically populated when users upload custom gigapixel images
-# All custom images are processed on-demand into tiles
-CUSTOM_IMAGES_CATALOG: Dict[str, Dict[str, Any]] = {}
 
 # ============================================================================
-# HELPER FUNCTIONS
+# DATA CATALOG INITIALIZATION
 # ============================================================================
 
-def generate_tile_url_template(
-    celestial_body: CelestialBody, 
-    layer: str, 
-    date: date, 
-    projection: str = "epsg3857"
-) -> str:
-    """
-    Generate tile URL template for any celestial body
-    The {z}/{x}/{y} placeholders will be replaced by the mapping library
+def initialize_catalog():
+    """Initialize the catalog with all available maps, sources, and layers"""
     
-    Supports:
-    - Earth: NASA GIBS (time-series data)
-    - Mars: NASA Trek (static mosaics)
-    - Moon: NASA Trek (static mosaics)
-    """
+    # ========== MAP SOURCES ==========
+    SOURCES[SourceId.NASA_GIBS] = Source(
+        id=SourceId.NASA_GIBS,
+        name="NASA GIBS",
+        description="NASA Global Imagery Browse Services - Near real-time satellite imagery",
+        attribution="NASA EOSDIS",
+        url="https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/gibs",
+        terms_of_use="Public domain"
+    )
     
-    # Earth - use NASA GIBS
-    if celestial_body == CelestialBody.EARTH:
-        date_str = date.strftime("%Y-%m-%d")
-        tile_matrix = "GoogleMapsCompatible_Level9" if projection == "epsg3857" else "250m"
-        return (
-            f"https://gibs.earthdata.nasa.gov/wmts/{projection}/best/"
-            f"{layer}/default/{date_str}/{tile_matrix}/{{z}}/{{y}}/{{x}}.jpg"
-        )
+    SOURCES[SourceId.NASA_TREK] = Source(
+        id=SourceId.NASA_TREK,
+        name="NASA Trek",
+        description="NASA Solar System Trek - Planetary mapping portal",
+        attribution="NASA/JPL-Caltech",
+        url="https://trek.nasa.gov",
+        terms_of_use="Public domain"
+    )
     
-    # Mars - multiple sources
-    elif celestial_body == CelestialBody.MARS:
-        if layer == "opm_mars_basemap":
-            # OpenPlanetaryMap Mars basemap
-            return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mars-basemap-v0-2/all/{z}/{x}/{y}.png"
-        else:
-            # NASA Trek WMTS format (Viking)
-            return (
-                f"https://trek.nasa.gov/tiles/Mars/EQ/{layer}/1.0.0/"
-                f"default/default028mm/{{z}}/{{y}}/{{x}}.jpg"
+    SOURCES[SourceId.OPENPLANETARYMAP] = Source(
+        id=SourceId.OPENPLANETARYMAP,
+        name="OpenPlanetaryMap",
+        description="Open planetary mapping project",
+        attribution="OpenPlanetaryMap Contributors",
+        url="https://www.openplanetary.org/opm",
+        terms_of_use="CC BY-SA 4.0"
+    )
+    
+    SOURCES[SourceId.USGS] = Source(
+        id=SourceId.USGS,
+        name="USGS Astrogeology",
+        description="United States Geological Survey Astrogeology Science Center",
+        attribution="USGS Astrogeology Science Center",
+        url="https://astrogeology.usgs.gov",
+        terms_of_use="Public domain"
+    )
+    
+    SOURCES[SourceId.CUSTOM] = Source(
+        id=SourceId.CUSTOM,
+        name="Custom Images",
+        description="User-uploaded custom gigapixel images",
+        attribution="User-provided",
+        terms_of_use="As specified by uploader"
+    )
+    
+    # ========== EARTH DATASETS ==========
+    
+    # VIIRS SNPP Map
+    DATASETS["viirs_snpp"] = Dataset(
+        id="viirs_snpp",
+        name="VIIRS SNPP",
+        description="Visible Infrared Imaging Radiometer Suite on Suomi NPP satellite",
+        source_id=SourceId.NASA_GIBS,
+        category=Category.PLANETS,
+        subject=Subject.EARTH,
+        supports_time_series=True,
+        date_range_start=date(2015, 11, 24),
+        date_range_end=date.today(),
+        default_date=date.today(),
+        variants=[
+            Variant(
+                id="true_color",
+                name="True Color",
+                description="Natural color composite",
+                tile_url_template="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/{date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg",
+                thumbnail_url="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/{date}/GoogleMapsCompatible_Level9/0/0/0.jpg",
+                max_zoom=9,
+                is_default=True
+            ),
+            Variant(
+                id="false_color",
+                name="False Color",
+                description="False color composite (Bands M11-I2-I1)",
+                tile_url_template="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_BandsM11-I2-I1/default/{date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg",
+                thumbnail_url="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_BandsM11-I2-I1/default/{date}/GoogleMapsCompatible_Level9/0/0/0.jpg",
+                max_zoom=9
             )
+        ]
+    )
     
-    # Moon - use public tile services
-    elif celestial_body == CelestialBody.MOON:
-        if layer == "opm_moon_basemap":
-            # OpenPlanetaryMap Moon basemap
-            return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-moon-basemap-v0-1/all/{z}/{x}/{y}.png"
-        elif layer == "moon_usgs_unified_geologic_map":
-            # USGS Unified Geologic Map of the Moon
-            return "https://bm2ms.rsl.wustl.edu/arcgis/rest/services/moon_c0/moon_bm_usgs_Unified_Geologic_Map_p2_c0/MapServer/tile/{z}/{y}/{x}"
-        else:
-            raise ValueError(f"Unknown Moon layer: {layer}")
-    
-    # Mercury - OpenPlanetaryMap
-    elif celestial_body == CelestialBody.MERCURY:
-        if layer == "opm_mercury_basemap":
-            return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mercury-basemap-v0-1/all/{z}/{x}/{y}.png"
-        else:
-            raise ValueError(f"Unknown Mercury layer: {layer}")
-    
-    # Custom - user-uploaded gigapixel images
-    elif celestial_body == CelestialBody.CUSTOM:
-        if layer not in CUSTOM_IMAGES_CATALOG:
-            raise ValueError(f"Unknown custom image: {layer}")
-        
-        obj = CUSTOM_IMAGES_CATALOG[layer]
-        image_url = obj["image_url"]
-        
-        # Check if tiles are ready
-        if tile_processor.is_tiled(image_url):
-            # Return tile URL template
-            return tile_processor.get_tile_url_template(image_url)
-        else:
-            # Tiles not ready - return placeholder
-            return f"/api/tile-placeholder/{layer}"
-    
-    raise ValueError(f"Unsupported celestial body: {celestial_body}")
-
-def generate_thumbnail_url(
-    celestial_body: CelestialBody,
-    layer: str, 
-    date: date, 
-    projection: str = "epsg3857"
-) -> str:
-    """Generate thumbnail URL at zoom level 0"""
-    
-    # Earth - use GIBS
-    if celestial_body == CelestialBody.EARTH:
-        date_str = date.strftime("%Y-%m-%d")
-        tile_matrix = "GoogleMapsCompatible_Level9" if projection == "epsg3857" else "250m"
-        return (
-            f"https://gibs.earthdata.nasa.gov/wmts/{projection}/best/"
-            f"{layer}/default/{date_str}/{tile_matrix}/0/0/0.jpg"
-        )
-    
-    # Mars - multiple sources
-    elif celestial_body == CelestialBody.MARS:
-        if layer == "opm_mars_basemap":
-            return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mars-basemap-v0-2/all/0/0/0.png"
-        else:
-            return (
-                f"https://trek.nasa.gov/tiles/Mars/EQ/{layer}/1.0.0/"
-                f"default/default028mm/0/0/0.jpg"
+    # MODIS Terra Map
+    DATASETS["modis_terra"] = Dataset(
+        id="modis_terra",
+        name="MODIS Terra",
+        description="Moderate Resolution Imaging Spectroradiometer on Terra satellite",
+        source_id=SourceId.NASA_GIBS,
+        category=Category.PLANETS,
+        subject=Subject.EARTH,
+        supports_time_series=True,
+        date_range_start=date(2000, 2, 24),
+        date_range_end=date.today(),
+        default_date=date.today(),
+        variants=[
+            Variant(
+                id="true_color",
+                name="True Color",
+                description="Natural color composite",
+                tile_url_template="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/{date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg",
+                thumbnail_url="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/{date}/GoogleMapsCompatible_Level9/0/0/0.jpg",
+                max_zoom=9,
+                is_default=True
+            ),
+            Variant(
+                id="false_color",
+                name="False Color (Bands 7-2-1)",
+                description="False color composite emphasizing vegetation",
+                tile_url_template="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_Bands721/default/{date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg",
+                thumbnail_url="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_Bands721/default/{date}/GoogleMapsCompatible_Level9/0/0/0.jpg",
+                max_zoom=9
             )
+        ]
+    )
     
-    # Moon - public tile services
-    elif celestial_body == CelestialBody.MOON:
-        if layer == "opm_moon_basemap":
-            return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-moon-basemap-v0-1/all/0/0/0.png"
-        elif layer == "moon_usgs_unified_geologic_map":
-            return "https://bm2ms.rsl.wustl.edu/arcgis/rest/services/moon_c0/moon_bm_usgs_Unified_Geologic_Map_p2_c0/MapServer/tile/0/0/0"
-        else:
-            raise ValueError(f"Unknown Moon layer: {layer}")
+    # ========== MARS DATASETS ==========
     
-    # Mercury - OpenPlanetaryMap
-    elif celestial_body == CelestialBody.MERCURY:
-        if layer == "opm_mercury_basemap":
-            return "https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mercury-basemap-v0-1/all/0/0/0.png"
-        else:
-            raise ValueError(f"Unknown Mercury layer: {layer}")
+    # Viking Mosaic
+    DATASETS["mars_viking"] = Dataset(
+        id="mars_viking",
+        name="Mars Viking Mosaic",
+        description="Viking Orbiter colorized mosaic (232m/pixel)",
+        source_id=SourceId.NASA_TREK,
+        category=Category.PLANETS,
+        subject=Subject.MARS,
+        supports_time_series=False,
+        variants=[
+            Variant(
+                id="colorized",
+                name="Colorized",
+                description="Colorized global mosaic",
+                tile_url_template="https://trek.nasa.gov/tiles/Mars/EQ/Mars_Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg",
+                thumbnail_url="https://trek.nasa.gov/tiles/Mars/EQ/Mars_Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/0/0/0.jpg",
+                max_zoom=9,
+                is_default=True
+            )
+        ]
+    )
     
-    # Custom - user-uploaded images
-    elif celestial_body == CelestialBody.CUSTOM:
-        if layer not in CUSTOM_IMAGES_CATALOG:
-            raise ValueError(f"Unknown custom image: {layer}")
-        
-        obj = CUSTOM_IMAGES_CATALOG[layer]
-        image_url = obj["image_url"]
-        
-        # If tiles exist, use zoom 0 tile as thumbnail
-        if tile_processor.is_tiled(image_url):
-            tile_id = tile_processor._generate_tile_id(image_url)
-            return f"/tiles/{tile_id}/0/0/0.png"
-        else:
-            # Tiles not ready - return placeholder
-            return f"/api/tile-placeholder/{layer}"
+    # Mars OPM Basemap
+    DATASETS["mars_opm_basemap"] = Dataset(
+        id="mars_opm_basemap",
+        name="Mars Basemap",
+        description="OpenPlanetaryMap Mars basemap",
+        source_id=SourceId.OPENPLANETARYMAP,
+        category=Category.PLANETS,
+        subject=Subject.MARS,
+        supports_time_series=False,
+        variants=[
+            Variant(
+                id="default",
+                name="Default",
+                description="Standard basemap",
+                tile_url_template="https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mars-basemap-v0-2/all/{z}/{x}/{y}.png",
+                thumbnail_url="https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mars-basemap-v0-2/all/0/0/0.png",
+                max_zoom=18,
+                is_default=True
+            )
+        ]
+    )
     
-    raise ValueError(f"Unsupported celestial body: {celestial_body}")
+    # ========== MOON DATASETS ==========
+    
+    # Moon OPM Basemap
+    DATASETS["moon_opm_basemap"] = Dataset(
+        id="moon_opm_basemap",
+        name="Lunar Basemap",
+        description="OpenPlanetaryMap lunar basemap",
+        source_id=SourceId.OPENPLANETARYMAP,
+        category=Category.MOONS,
+        subject=Subject.MOON,
+        supports_time_series=False,
+        variants=[
+            Variant(
+                id="default",
+                name="Default",
+                description="Standard lunar basemap",
+                tile_url_template="https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-moon-basemap-v0-1/all/{z}/{x}/{y}.png",
+                thumbnail_url="https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-moon-basemap-v0-1/all/0/0/0.png",
+                max_zoom=18,
+                is_default=True
+            )
+        ]
+    )
+    
+    # Moon USGS Geologic Map
+    DATASETS["moon_usgs_geologic"] = Dataset(
+        id="moon_usgs_geologic",
+        name="Unified Geologic Map",
+        description="USGS Unified Geologic Map of the Moon",
+        source_id=SourceId.USGS,
+        category=Category.MOONS,
+        subject=Subject.MOON,
+        supports_time_series=False,
+        variants=[
+            Variant(
+                id="default",
+                name="Geologic",
+                description="Unified geologic map showing 49 lunar units",
+                tile_url_template="https://bm2ms.rsl.wustl.edu/arcgis/rest/services/moon_c0/moon_bm_usgs_Unified_Geologic_Map_p2_c0/MapServer/tile/{z}/{y}/{x}",
+                thumbnail_url="https://bm2ms.rsl.wustl.edu/arcgis/rest/services/moon_c0/moon_bm_usgs_Unified_Geologic_Map_p2_c0/MapServer/tile/0/0/0",
+                max_zoom=18,
+                is_default=True
+            )
+        ]
+    )
+    
+    # ========== MERCURY DATASETS ==========
+    
+    # Mercury OPM Basemap
+    DATASETS["mercury_opm_basemap"] = Dataset(
+        id="mercury_opm_basemap",
+        name="Mercury Basemap",
+        description="OpenPlanetaryMap Mercury basemap (MESSENGER)",
+        source_id=SourceId.OPENPLANETARYMAP,
+        category=Category.PLANETS,
+        subject=Subject.MERCURY,
+        supports_time_series=False,
+        variants=[
+            Variant(
+                id="default",
+                name="Default",
+                description="MESSENGER basemap",
+                tile_url_template="https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mercury-basemap-v0-1/all/{z}/{x}/{y}.png",
+                thumbnail_url="https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mercury-basemap-v0-1/all/0/0/0.png",
+                max_zoom=18,
+                is_default=True
+            )
+        ]
+    )
+
+# Initialize catalog on startup
+initialize_catalog()
 
 # ============================================================================
-# API ENDPOINTS
+# API ENDPOINTS - MAP DISCOVERY
 # ============================================================================
 
 @app.get("/")
 def root():
+    """API root"""
+    return {
+        "name": "Embiggen Your Eyes API",
+        "version": "1.0.0",
+        "description": "Hierarchical map data model with sources, maps, variants, and layers"
+    }
+
+@app.get("/api/health")
+def health_check():
     """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "service": "Embiggen Your Eyes API",
-        "version": "0.1.0",
-        "tile_processor": "enabled"
-    }
+    return {"status": "healthy", "version": "1.0.0"}
 
-# ----------------------------------------------------------------------------
-# TILE PROCESSING ENDPOINTS
-# ----------------------------------------------------------------------------
+@app.get("/api/categories")
+def get_categories():
+    """Get list of available categories"""
+    categories = {}
+    for dataset in DATASETS.values():
+        cat = dataset.category.value
+        if cat not in categories:
+            categories[cat] = {
+                "id": cat,
+                "name": cat.replace('_', ' ').title(),
+                "dataset_count": 0,
+                "subjects": set(),
+                "sources": set()
+            }
+        categories[cat]["dataset_count"] += 1
+        categories[cat]["subjects"].add(dataset.subject.value)
+        categories[cat]["sources"].add(dataset.source_id.value)
+    
+    # Convert sets to lists for JSON serialization
+    for cat in categories.values():
+        cat["subjects"] = list(cat["subjects"])
+        cat["sources"] = list(cat["sources"])
+    
+    return {"categories": list(categories.values())}
 
-
-class CustomImageRequest(BaseModel):
-    """Request to add a custom gigapixel image"""
-    name: str
-    image_url: str
-    description: Optional[str] = None
-    type: Optional[str] = "Custom Image"
-    telescope: Optional[str] = "Unknown"
-    distance: Optional[str] = "Unknown"
-    ra: Optional[float] = 0.0
-    dec: Optional[float] = 0.0
-    max_zoom: Optional[int] = 8
-
-@app.post("/api/custom-image")
-async def add_custom_image(request: CustomImageRequest, background_tasks: BackgroundTasks):
-    """
-    Add a custom gigapixel image from any URL
-    The image will be downloaded and converted to tiles automatically
-    """
-    # Generate a unique layer ID
-    layer_id = f"custom_{hashlib.md5(request.image_url.encode()).hexdigest()[:12]}"
-    
-    # Check if already exists in custom catalog
-    if layer_id in CUSTOM_IMAGES_CATALOG:
-        return {
-            "message": "Image already added",
-            "layer_id": layer_id,
-            "status": "exists",
-            "celestial_body": "custom"
-        }
-    
-    # Add to custom images catalog
-    CUSTOM_IMAGES_CATALOG[layer_id] = {
-        "name": request.name,
-        "type": request.type,
-        "distance": request.distance,
-        "telescope": request.telescope,
-        "image_url": request.image_url,
-        "ra": request.ra,
-        "dec": request.dec,
-        "description": request.description or f"Custom image: {request.name}",
-        "max_zoom_tiling": request.max_zoom
-    }
-    
-    # Trigger background processing
-    def process_in_background():
-        try:
-            tile_processor.process_image(request.image_url, CUSTOM_IMAGES_CATALOG[layer_id])
-        except Exception as e:
-            print(f"Tile processing failed for custom image {layer_id}: {e}")
-    
-    background_tasks.add_task(process_in_background)
-    
-    return {
-        "message": "Custom image added and processing started",
-        "layer_id": layer_id,
-        "celestial_body": "custom",
-        "status": "processing",
-        "check_status_url": f"/api/tile-status-by-url?url={request.image_url}",
-        "search_query": {
-            "celestial_body": "custom",
-            "layer": layer_id
-        }
-    }
-
-# ----------------------------------------------------------------------------
-@app.get("/api/layers")
-def get_available_layers(celestial_body: Optional[CelestialBody] = None):
-    """
-    Get list of available imagery layers, optionally filtered by celestial body
-    Returns layer information including name, value, celestial body, and description
-    """
-    
-    # Define layer metadata
-    layer_info = {
-        # Earth layers
-        ImageLayer.VIIRS_TRUE_COLOR: {
-            "celestial_body": CelestialBody.EARTH,
-            "satellite": "VIIRS SNPP",
-            "type": "True Color"
-        },
-        ImageLayer.VIIRS_FALSE_COLOR: {
-            "celestial_body": CelestialBody.EARTH,
-            "satellite": "VIIRS SNPP",
-            "type": "False Color"
-        },
-        ImageLayer.MODIS_TERRA_TRUE_COLOR: {
-            "celestial_body": CelestialBody.EARTH,
-            "satellite": "MODIS Terra",
-            "type": "True Color"
-        },
-        ImageLayer.MODIS_TERRA_FALSE_COLOR: {
-            "celestial_body": CelestialBody.EARTH,
-            "satellite": "MODIS Terra",
-            "type": "False Color"
-        },
-        # Mars layers
-        ImageLayer.MARS_VIKING_COLOR: {
-            "celestial_body": CelestialBody.MARS,
-            "satellite": "Viking Orbiter (Trek)",
-            "type": "Colorized Mosaic (232m/px)"
-        },
-        ImageLayer.MARS_BASEMAP_OPM: {
-            "celestial_body": CelestialBody.MARS,
-            "satellite": "OpenPlanetaryMap",
-            "type": "Mars Basemap"
-        },
-        # Moon layers
-        ImageLayer.MOON_BASEMAP_OPM: {
-            "celestial_body": CelestialBody.MOON,
-            "satellite": "OpenPlanetaryMap",
-            "type": "Lunar Basemap"
-        },
-        ImageLayer.MOON_USGS_GEOLOGIC: {
-            "celestial_body": CelestialBody.MOON,
-            "satellite": "USGS",
-            "type": "Unified Geologic Map"
-        },
-        # Mercury layers
-        ImageLayer.MERCURY_BASEMAP_OPM: {
-            "celestial_body": CelestialBody.MERCURY,
-            "satellite": "OpenPlanetaryMap",
-            "type": "Mercury Basemap (MESSENGER)"
-        }
-    }
-    
-    layers = []
-    for layer in ImageLayer:
-        info = layer_info.get(layer, {
-            "celestial_body": CelestialBody.EARTH,
-            "satellite": "Unknown",
-            "type": "Unknown"
-        })
+@app.get("/api/sources")
+def get_sources(category: Optional[Category] = None, subject: Optional[Subject] = None):
+    """Get list of sources, optionally filtered by category or subject"""
+    sources = []
+    for source in SOURCES.values():
+        # Count datasets for this source
+        dataset_count = sum(
+            1 for d in DATASETS.values()
+            if d.source_id == source.id and (
+                category is None or d.category == category
+            ) and (
+                subject is None or d.subject == subject
+            )
+        )
         
-        # Filter by celestial body if specified
-        if celestial_body and info["celestial_body"] != celestial_body:
+        if dataset_count > 0 or (category is None and subject is None):
+            sources.append({
+                **source.model_dump(),
+                "dataset_count": dataset_count
+            })
+    
+    return {"sources": sources}
+
+@app.get("/api/datasets")
+def get_datasets(
+    category: Optional[Category] = None,
+    subject: Optional[Subject] = None,
+    source_id: Optional[SourceId] = None,
+    supports_time_series: Optional[bool] = None
+):
+    """Get list of datasets with optional filters"""
+    filtered_datasets = []
+    
+    for dataset in DATASETS.values():
+        # Apply filters
+        if category and dataset.category != category:
+            continue
+        if subject and dataset.subject != subject:
+            continue
+        if source_id and dataset.source_id != source_id:
+            continue
+        if supports_time_series is not None and dataset.supports_time_series != supports_time_series:
             continue
         
-        name = layer.name.replace('_', ' ').title()
-        
-        layers.append({
-            "id": layer.name,
-            "value": layer.value,
-            "display_name": name,
-            "celestial_body": info["celestial_body"].value,
-            "satellite": info["satellite"],
-            "type": info["type"],
-            "description": f"{info['celestial_body'].value.title()} - {info['satellite']} {info['type']}"
-        })
+        filtered_datasets.append(dataset)
     
+    return {"datasets": filtered_datasets, "count": len(filtered_datasets)}
+
+@app.get("/api/datasets/{dataset_id}")
+def get_dataset(dataset_id: str):
+    """Get details for a specific dataset"""
+    if dataset_id not in DATASETS:
+        raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset_id}")
+    
+    return DATASETS[dataset_id]
+
+@app.get("/api/datasets/{dataset_id}/variants")
+def get_dataset_variants(dataset_id: str):
+    """Get variants for a specific dataset"""
+    if dataset_id not in DATASETS:
+        raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset_id}")
+    
+    dataset = DATASETS[dataset_id]
     return {
-        "layers": layers,
-        "total": len(layers),
-        "celestial_body": celestial_body.value if celestial_body else "all"
+        "dataset_id": dataset_id,
+        "dataset_name": dataset.name,
+        "variants": dataset.variants
     }
 
-# SEARCH & DISCOVERY
-# ----------------------------------------------------------------------------
-
-@app.post("/api/search/images", response_model=List[ImageMetadata])
-async def search_images(query: ImageSearchQuery, background_tasks: BackgroundTasks):
-    """
-    Search for NASA imagery based on criteria
-    Returns metadata for matching images (tiles served by NASA GIBS or processed on-demand)
-    """
-    results = []
+@app.get("/api/datasets/{dataset_id}/variants/{variant_id}")
+def get_dataset_variant(dataset_id: str, variant_id: str, date_param: Optional[date] = None):
+    """Get specific variant with resolved tile URLs"""
+    if dataset_id not in DATASETS:
+        raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset_id}")
     
-    # For custom images, automatically trigger tile processing if needed
-    if query.celestial_body == CelestialBody.CUSTOM and query.layer in CUSTOM_IMAGES_CATALOG:
-        obj = CUSTOM_IMAGES_CATALOG[query.layer]
-        image_url = obj["image_url"]
-        
-        # If not yet tiled, trigger background processing
-        if not tile_processor.is_tiled(image_url):
-            status = tile_processor.get_processing_status(image_url)
-            if status.get("status") != "processing":
-                # Trigger processing in background
-                def process_in_background():
-                    try:
-                        tile_processor.process_image(image_url, obj)
-                    except Exception as e:
-                        print(f"Tile processing failed for custom image {query.layer}: {e}")
-                
-                background_tasks.add_task(process_in_background)
+    dataset = DATASETS[dataset_id]
+    variant = next((v for v in dataset.variants if v.id == variant_id), None)
     
-    # Default date range if not specified
-    date_start = query.date_start or date(2024, 1, 1)
-    date_end = query.date_end or date.today()
+    if not variant:
+        raise HTTPException(status_code=404, detail=f"Variant not found: {variant_id}")
     
-    # For MVP, generate sample results
-    # In production, query NASA CMR API or maintain an index
-    current_date = date_start
-    count = 0
+    # Resolve date for time-series maps
+    selected_date = date_param or dataset.default_date or date.today()
     
-    # Determine max_zoom based on celestial body and layer
-    if query.celestial_body == CelestialBody.EARTH:
-        max_zoom = 9  # GIBS supports up to zoom 9 for most layers
-    elif query.celestial_body == CelestialBody.MARS:
-        max_zoom = 12  # Mars high-res layers
-    elif query.celestial_body == CelestialBody.MOON:
-        max_zoom = 10
-    elif query.celestial_body == CelestialBody.MERCURY:
-        max_zoom = 10  # Mercury basemap
-    elif query.celestial_body == CelestialBody.CUSTOM:
-        # Custom images - check processing status
-        if query.layer in CUSTOM_IMAGES_CATALOG:
-            obj = CUSTOM_IMAGES_CATALOG[query.layer]
-            image_url = obj["image_url"]
-            tile_info = tile_processor.get_tile_info(image_url)
-            if tile_info and tile_info.get("status") == "completed":
-                max_zoom = tile_info.get("max_zoom", 8)
-            else:
-                max_zoom = 8  # Default while processing
-        else:
-            max_zoom = 8
-    else:
-        max_zoom = 9
+    # Replace {date} placeholder in URLs if needed
+    tile_url = variant.tile_url_template
+    thumbnail_url = variant.thumbnail_url
     
-    # For non-Earth bodies (static images/mosaics), only return one result since there's no time-series
-    limit = 1 if query.celestial_body != CelestialBody.EARTH else query.limit
-    
-    while current_date <= date_end and count < limit:
-        image_id = f"{query.celestial_body.value}_{query.layer}_{current_date.isoformat()}"
-        
-        # Default bbox (global view)
-        bbox = query.bbox or BoundingBox(north=90, south=-90, east=180, west=-180)
-        
-        # Generate description with rich metadata
-        if query.celestial_body == CelestialBody.CUSTOM and query.layer in CUSTOM_IMAGES_CATALOG:
-            obj = CUSTOM_IMAGES_CATALOG[query.layer]
-            description = f"{obj['name']} - {obj['type']}. {obj['description']}"
-        else:
-            description = f"{query.celestial_body.value.title()} - {query.layer} imagery from {current_date}"
-        
-        results.append(ImageMetadata(
-            id=image_id,
-            layer=query.layer,
-            date=current_date,
-            bbox=bbox,
-            tile_url=generate_tile_url_template(query.celestial_body, query.layer, current_date, query.projection),
-            thumbnail_url=generate_thumbnail_url(query.celestial_body, query.layer, current_date, query.projection),
-            projection=query.projection,
-            max_zoom=max_zoom,
-            description=description
-        ))
-        
-        # Skip to next week for Earth time-series
-        from datetime import timedelta
-        current_date += timedelta(days=7)
-        count += 1
-    
-    # Store search history
-    search_history.append(query)
-    
-    return results
-
-@app.get("/api/search/history")
-def get_search_history():
-    """Get recent search queries"""
-    return search_history[-10:]  # Last 10 searches
-
-@app.post("/api/images/compare")
-def compare_images(image_ids: List[str]):
-    """
-    Prepare multiple images for side-by-side comparison
-    Returns configuration for overlay/comparison view
-    """
-    if len(image_ids) < 2:
-        raise HTTPException(status_code=400, detail="Need at least 2 images to compare")
+    if dataset.supports_time_series:
+        date_str = selected_date.strftime("%Y-%m-%d")
+        tile_url = tile_url.replace("{date}", date_str)
+        thumbnail_url = thumbnail_url.replace("{date}", date_str)
     
     return {
-        "comparison_id": str(uuid.uuid4()),
-        "image_ids": image_ids,
-        "comparison_modes": ["side-by-side", "overlay", "swipe", "difference"],
-        "recommended_mode": "swipe" if len(image_ids) == 2 else "side-by-side"
+        "dataset_id": dataset_id,
+        "variant": {
+            **variant.model_dump(),
+            "tile_url": tile_url,
+            "thumbnail_url": thumbnail_url,
+            "selected_date": selected_date if dataset.supports_time_series else None
+        }
     }
 
-# ----------------------------------------------------------------------------
-# ANNOTATIONS
-# ----------------------------------------------------------------------------
+# ============================================================================
+# API ENDPOINTS - MAP VIEWS (User-Saved Configurations)
+# ============================================================================
+
+@app.post("/api/views", response_model=View)
+def create_map_view(view: View):
+    """Create a new saved map view"""
+    view.id = str(uuid.uuid4())
+    view.created_at = datetime.now()
+    view.updated_at = datetime.now()
+    
+    # Validate map and variant exist
+    if view.dataset_id not in DATASETS:
+        raise HTTPException(status_code=404, detail=f"Map not found: {view.dataset_id}")
+    
+    dataset = DATASETS[view.dataset_id]
+    if not any(v.id == view.variant_id for v in dataset.variants):
+        raise HTTPException(status_code=404, detail=f"Variant not found: {view.variant_id}")
+    
+    views_db[view.id] = view
+    return view
+
+@app.get("/api/views")
+def get_map_views():
+    """Get all saved map views"""
+    return {"views": list(views_db.values()), "count": len(views_db)}
+
+@app.get("/api/views/{view_id}", response_model=View)
+def get_map_view(view_id: str):
+    """Get a specific map view"""
+    if view_id not in views_db:
+        raise HTTPException(status_code=404, detail="View not found")
+    return views_db[view_id]
+
+@app.put("/api/views/{view_id}", response_model=View)
+def update_map_view(view_id: str, view: View):
+    """Update a map view"""
+    if view_id not in views_db:
+        raise HTTPException(status_code=404, detail="View not found")
+    
+    view.id = view_id
+    view.updated_at = datetime.now()
+    views_db[view_id] = view
+    return view
+
+@app.delete("/api/views/{view_id}")
+def delete_map_view(view_id: str):
+    """Delete a map view"""
+    if view_id not in views_db:
+        raise HTTPException(status_code=404, detail="View not found")
+    
+    del views_db[view_id]
+    return {"message": "View deleted successfully"}
+
+# ============================================================================
+# API ENDPOINTS - ANNOTATIONS
+# ============================================================================
 
 @app.post("/api/annotations", response_model=Annotation)
 def create_annotation(annotation: Annotation):
-    """Create a new annotation on an image"""
+    """Create a new annotation"""
     annotation.id = str(uuid.uuid4())
     annotation.created_at = datetime.now()
     annotation.updated_at = datetime.now()
-    
     annotations_db[annotation.id] = annotation
     return annotation
 
-@app.get("/api/annotations/image/{image_id}", response_model=List[Annotation])
-def get_image_annotations(image_id: str):
-    """Get all annotations for a specific image"""
-    return [
-        ann for ann in annotations_db.values()
-        if ann.image_id == image_id
-    ]
+@app.get("/api/annotations")
+def get_annotations(map_view_id: Optional[str] = None):
+    """Get annotations, optionally filtered by map view"""
+    if map_view_id:
+        filtered = [a for a in annotations_db.values() if a.map_view_id == map_view_id]
+        return {"annotations": filtered}
+    return {"annotations": list(annotations_db.values())}
+
+@app.get("/api/annotations/{annotation_id}", response_model=Annotation)
+def get_annotation(annotation_id: str):
+    """Get a specific annotation"""
+    if annotation_id not in annotations_db:
+        raise HTTPException(status_code=404, detail="Annotation not found")
+    return annotations_db[annotation_id]
 
 @app.put("/api/annotations/{annotation_id}", response_model=Annotation)
 def update_annotation(annotation_id: str, annotation: Annotation):
-    """Update an existing annotation"""
+    """Update an annotation"""
     if annotation_id not in annotations_db:
         raise HTTPException(status_code=404, detail="Annotation not found")
     
@@ -615,93 +717,25 @@ def delete_annotation(annotation_id: str):
         raise HTTPException(status_code=404, detail="Annotation not found")
     
     del annotations_db[annotation_id]
-    return {"status": "deleted", "id": annotation_id}
+    return {"message": "Annotation deleted successfully"}
 
-# ----------------------------------------------------------------------------
-# IMAGE LINKS & RELATIONSHIPS
-# ----------------------------------------------------------------------------
-
-@app.post("/api/links", response_model=ImageLink)
-def create_link(link: ImageLink):
-    """Create a link between two images"""
-    link.id = str(uuid.uuid4())
-    link.created_at = datetime.now()
-    
-    links_db[link.id] = link
-    return link
-
-@app.get("/api/links/image/{image_id}", response_model=List[ImageLink])
-def get_image_links(image_id: str):
-    """Get all links for an image (both source and target)"""
-    return [
-        link for link in links_db.values()
-        if link.source_image_id == image_id or link.target_image_id == image_id
-    ]
-
-@app.delete("/api/links/{link_id}")
-def delete_link(link_id: str):
-    """Delete a link between images"""
-    if link_id not in links_db:
-        raise HTTPException(status_code=404, detail="Link not found")
-    
-    del links_db[link_id]
-    return {"status": "deleted", "id": link_id}
-
-@app.get("/api/links/graph/{image_id}")
-def get_link_graph(image_id: str, depth: int = 2):
-    """
-    Get a graph of linked images starting from an image
-    Useful for visualizing related image networks
-    """
-    def build_graph(current_id: str, current_depth: int, visited: set):
-        if current_depth > depth or current_id in visited:
-            return []
-        
-        visited.add(current_id)
-        related = []
-        
-        for link in links_db.values():
-            if link.source_image_id == current_id:
-                related.append({
-                    "link": link,
-                    "target_image_id": link.target_image_id,
-                    "children": build_graph(link.target_image_id, current_depth + 1, visited)
-                })
-            elif link.target_image_id == current_id:
-                related.append({
-                    "link": link,
-                    "target_image_id": link.source_image_id,
-                    "children": build_graph(link.source_image_id, current_depth + 1, visited)
-                })
-        
-        return related
-    
-    graph = build_graph(image_id, 0, set())
-    return {
-        "root_image_id": image_id,
-        "graph": graph,
-        "total_nodes": len(set(link.source_image_id for link in links_db.values()) | 
-                           set(link.target_image_id for link in links_db.values()))
-    }
-
-# ----------------------------------------------------------------------------
-# COLLECTIONS (for organizing images)
-# ----------------------------------------------------------------------------
+# ============================================================================
+# API ENDPOINTS - COLLECTIONS
+# ============================================================================
 
 @app.post("/api/collections", response_model=Collection)
 def create_collection(collection: Collection):
-    """Create a new collection of images"""
+    """Create a new collection"""
     collection.id = str(uuid.uuid4())
     collection.created_at = datetime.now()
     collection.updated_at = datetime.now()
-    
     collections_db[collection.id] = collection
     return collection
 
-@app.get("/api/collections", response_model=List[Collection])
+@app.get("/api/collections")
 def get_collections():
     """Get all collections"""
-    return list(collections_db.values())
+    return {"collections": list(collections_db.values())}
 
 @app.get("/api/collections/{collection_id}", response_model=Collection)
 def get_collection(collection_id: str):
@@ -710,17 +744,15 @@ def get_collection(collection_id: str):
         raise HTTPException(status_code=404, detail="Collection not found")
     return collections_db[collection_id]
 
-@app.put("/api/collections/{collection_id}/images", response_model=Collection)
-def add_images_to_collection(collection_id: str, image_ids: List[str]):
-    """Add images to a collection"""
+@app.put("/api/collections/{collection_id}", response_model=Collection)
+def update_collection(collection_id: str, collection: Collection):
+    """Update a collection"""
     if collection_id not in collections_db:
         raise HTTPException(status_code=404, detail="Collection not found")
     
-    collection = collections_db[collection_id]
-    collection.image_ids.extend(image_ids)
-    collection.image_ids = list(set(collection.image_ids))  # Remove duplicates
+    collection.id = collection_id
     collection.updated_at = datetime.now()
-    
+    collections_db[collection_id] = collection
     return collection
 
 @app.delete("/api/collections/{collection_id}")
@@ -730,86 +762,12 @@ def delete_collection(collection_id: str):
         raise HTTPException(status_code=404, detail="Collection not found")
     
     del collections_db[collection_id]
-    return {"status": "deleted", "id": collection_id}
-
-# ----------------------------------------------------------------------------
-# SMART FEATURES
-# ----------------------------------------------------------------------------
-
-@app.get("/api/suggestions/similar/{image_id}")
-def suggest_similar_images(image_id: str, limit: int = 5):
-    """
-    Suggest similar images based on location, date, or linked images
-    (MVP: simple rule-based, can be enhanced with ML)
-    """
-    # Parse image_id to extract metadata
-    parts = image_id.split("_")
-    if len(parts) < 2:
-        raise HTTPException(status_code=400, detail="Invalid image_id format")
-    
-    layer = "_".join(parts[:-1])
-    date_str = parts[-1]
-    
-    suggestions = []
-    
-    # Suggest same location, different dates
-    from datetime import timedelta, date as date_type
-    try:
-        base_date = date_type.fromisoformat(date_str)
-        for days in [-7, -1, 1, 7]:
-            new_date = base_date + timedelta(days=days)
-            suggestions.append({
-                "image_id": f"{layer}_{new_date.isoformat()}",
-                "reason": f"{abs(days)} days {'before' if days < 0 else 'after'}",
-                "confidence": 0.9
-            })
-    except ValueError:
-        pass
-    
-    # Suggest linked images
-    linked = get_image_links(image_id)
-    for link in linked[:limit]:
-        target_id = (link.target_image_id if link.source_image_id == image_id 
-                    else link.source_image_id)
-        suggestions.append({
-            "image_id": target_id,
-            "reason": f"Linked: {link.relationship_type}",
-            "confidence": 0.95
-        })
-    
-    return suggestions[:limit]
-
-@app.get("/api/analytics/user-activity")
-def get_user_activity():
-    """Get user activity analytics"""
-    return {
-        "total_annotations": len(annotations_db),
-        "total_links": len(links_db),
-        "total_collections": len(collections_db),
-        "total_searches": len(search_history),
-        "most_annotated_images": _get_most_annotated_images(),
-        "popular_layers": _get_popular_layers()
-    }
-
-def _get_most_annotated_images():
-    """Helper to find most annotated images"""
-    from collections import Counter
-    image_counts = Counter(ann.image_id for ann in annotations_db.values())
-    return [{"image_id": img_id, "count": count} 
-            for img_id, count in image_counts.most_common(5)]
-
-def _get_popular_layers():
-    """Helper to find most searched layers"""
-    from collections import Counter
-    layer_counts = Counter(query.layer for query in search_history if query.layer)
-    return [{"layer": layer, "count": count} 
-            for layer, count in layer_counts.most_common(5)]
+    return {"message": "Collection deleted successfully"}
 
 # ============================================================================
-# RUN SERVER
+# STARTUP
 # ============================================================================
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
-
+    uvicorn.run(app, host="0.0.0.0", port=8000)
