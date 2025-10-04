@@ -180,6 +180,21 @@ body {
     font-size: 20px;
 }
 
+/* Delete button with better visibility */
+.delete-btn {
+    background: rgba(255, 59, 48, 0.1) !important;
+    color: var(--ios-red) !important;
+}
+
+.delete-btn:hover {
+    background: rgba(255, 59, 48, 0.2) !important;
+    transform: scale(1.1);
+}
+
+.delete-btn .material-icons-round {
+    color: var(--ios-red);
+}
+
 /* ============================================
    Bottom Sheet - iOS Style
    ============================================ */
@@ -673,6 +688,17 @@ body {
     font-size: 15px;
     font-weight: 600;
     margin-bottom: 2px;
+}
+
+.list-item-title.editable {
+    cursor: text;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background var(--transition-fast);
+}
+
+.list-item-title.editable:hover {
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .list-item-desc {

@@ -419,7 +419,8 @@ function handleMapMouseMove(e) {
 
 // Marker annotation
 async function createMarkerAnnotation(latlng) {
-    const name = prompt('Marker name (optional):') || `Marker ${Date.now()}`;
+    // Use default name, user can edit later
+    const name = `Marker ${AppState.annotations.length + 1}`;
     
     const annotation = await createAnnotation(
         AppState.currentImage.id,
@@ -476,7 +477,8 @@ async function finishPath() {
         return;
     }
     
-    const name = prompt('Path name (optional):') || `Path ${Date.now()}`;
+    // Use default name, user can edit later
+    const name = `Path ${AppState.annotations.length + 1}`;
     
     const coordinates = AppState.drawingPath.map(p => ({lat: p.lat, lng: p.lng}));
     
@@ -522,7 +524,8 @@ function updateRectanglePreview(latlng) {
 }
 
 async function finishRectangle(latlng) {
-    const name = prompt('Rectangle name (optional):') || `Rectangle ${Date.now()}`;
+    // Use default name, user can edit later
+    const name = `Rectangle ${AppState.annotations.length + 1}`;
     
     const coordinates = [
         {lat: AppState.drawingStart.lat, lng: AppState.drawingStart.lng},
@@ -573,7 +576,8 @@ function updateCirclePreview(latlng) {
 
 async function finishCircle(latlng) {
     const radius = AppState.drawingStart.distanceTo(latlng);
-    const name = prompt('Circle name (optional):') || `Circle ${Date.now()}`;
+    // Use default name, user can edit later
+    const name = `Circle ${AppState.annotations.length + 1}`;
     
     const coordinates = [
         {lat: AppState.drawingStart.lat, lng: AppState.drawingStart.lng}
@@ -675,6 +679,12 @@ function enterDrawingMode(mode) {
     
     // Update tool button states
     updateToolButtonStates();
+    
+    // Collapse the bottom sheet to focus on map
+    const controlSheet = document.getElementById('control-sheet');
+    if (controlSheet && !controlSheet.classList.contains('collapsed')) {
+        controlSheet.classList.add('collapsed');
+    }
 }
 
 function exitDrawingMode() {
@@ -768,8 +778,8 @@ function renderLayersList(layers) {
             <div class="layer-info">
                 <div class="layer-name">${layer.display_name}</div>
                 <div class="layer-desc">${layer.type}</div>
-            </div>
-        `;
+        </div>
+    `;
         
         card.addEventListener('click', () => {
             AppState.currentLayer = layer.value;
@@ -832,17 +842,24 @@ function renderAnnotationsList(annotations) {
                 <span class="material-icons-round">${icons[ann.type] || 'place'}</span>
             </div>
             <div class="list-item-info">
-                <div class="list-item-title">${ann.text || 'Annotation'}</div>
+                <div class="list-item-title editable" data-annotation-id="${ann.id}">${ann.text || 'Annotation'}</div>
                 <div class="list-item-desc">${ann.type}</div>
             </div>
-            <button class="icon-btn" onclick="deleteAnnotation('${ann.id}')">
+            <button class="icon-btn delete-btn" onclick="deleteAnnotation('${ann.id}')" title="Delete">
                 <span class="material-icons-round">delete</span>
             </button>
         `;
         
-        // Click to focus on annotation
+        // Click to focus on annotation and center map
         item.addEventListener('click', (e) => {
-            if (!e.target.closest('.icon-btn') && ann._leafletLayer) {
+            if (!e.target.closest('.icon-btn') && !e.target.classList.contains('editable') && ann._leafletLayer) {
+                // Collapse the sheet to focus on map
+                const controlSheet = document.getElementById('control-sheet');
+                if (controlSheet) {
+                    controlSheet.classList.add('collapsed');
+                }
+                
+                // Center map on annotation
                 if (ann.type === 'point') {
                     map.setView([ann.coordinates[0].lat, ann.coordinates[0].lng], Math.max(map.getZoom(), 6));
                 } else {
@@ -852,8 +869,38 @@ function renderAnnotationsList(annotations) {
             }
         });
         
+        // Make title editable on double-click
+        const titleEl = item.querySelector('.editable');
+        titleEl.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            const newName = prompt('Edit name:', ann.text);
+            if (newName && newName !== ann.text) {
+                updateAnnotationName(ann.id, newName);
+            }
+        });
+        
         annotationsList.appendChild(item);
     });
+}
+
+async function updateAnnotationName(annotationId, newName) {
+    try {
+        const annotation = AppState.annotations.find(a => a.id === annotationId);
+        if (!annotation) return;
+        
+        annotation.text = newName;
+        
+        await apiRequest(`/api/annotations/${annotationId}`, {
+            method: 'PUT',
+            body: JSON.stringify(annotation)
+        });
+        
+        renderAnnotationsList(AppState.annotations);
+        showStatus('Name updated', 'success');
+    } catch (error) {
+        console.error('Failed to update annotation name:', error);
+        showStatus('Failed to update name', 'error');
+    }
 }
 
 function renderCollectionsList(collections) {
