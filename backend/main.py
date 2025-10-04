@@ -27,11 +27,10 @@ app.add_middleware(
 
 class ImageLayer(str, Enum):
     """Available NASA GIBS layers"""
-    TRUE_COLOR = "MODIS_Terra_CorrectedReflectance_TrueColor"
-    FALSE_COLOR = "MODIS_Terra_CorrectedReflectance_Bands721"
-    FIRES = "MODIS_Terra_Thermal_Anomalies_All"
-    SNOW_COVER = "MODIS_Terra_Snow_Cover"
-    CHLOROPHYLL = "MODIS_Terra_Chlorophyll_A"
+    VIIRS_TRUE_COLOR = "VIIRS_SNPP_CorrectedReflectance_TrueColor"
+    VIIRS_FALSE_COLOR = "VIIRS_SNPP_CorrectedReflectance_BandsM11-I2-I1"
+    MODIS_TERRA_TRUE_COLOR = "MODIS_Terra_CorrectedReflectance_TrueColor"
+    MODIS_TERRA_FALSE_COLOR = "MODIS_Terra_CorrectedReflectance_Bands721"
 
 class BoundingBox(BaseModel):
     north: float
@@ -40,10 +39,11 @@ class BoundingBox(BaseModel):
     west: float
 
 class ImageSearchQuery(BaseModel):
-    layer: Optional[ImageLayer] = ImageLayer.TRUE_COLOR
+    layer: Optional[ImageLayer] = ImageLayer.VIIRS_TRUE_COLOR
     date_start: Optional[date] = None
     date_end: Optional[date] = None
     bbox: Optional[BoundingBox] = None
+    projection: str = "epsg3857"  # epsg3857 (Web Mercator) or epsg4326 (Geographic)
     limit: int = 50
 
 class ImageMetadata(BaseModel):
@@ -51,8 +51,10 @@ class ImageMetadata(BaseModel):
     layer: str
     date: date
     bbox: BoundingBox
-    tile_url: str
+    tile_url: str  # Template URL with {z}/{x}/{y} placeholders
     thumbnail_url: str
+    projection: str = "epsg3857"
+    max_zoom: int = 9
     description: Optional[str] = None
 
 class AnnotationType(str, Enum):
@@ -103,20 +105,34 @@ search_history: List[ImageSearchQuery] = []
 # HELPER FUNCTIONS
 # ============================================================================
 
-def generate_gibs_url(layer: str, date: date, z: int, x: int, y: int) -> str:
-    """Generate NASA GIBS tile URL"""
+def generate_gibs_url_template(layer: str, date: date, projection: str = "epsg3857") -> str:
+    """
+    Generate NASA GIBS tile URL template for use with Leaflet/OpenLayers
+    The {z}/{x}/{y} placeholders will be replaced by the mapping library
+    
+    Note: Using epsg3857 (Web Mercator) by default as it's standard for web maps
+    Use epsg4326 (Geographic) if you need lat/lng coordinates
+    """
     date_str = date.strftime("%Y-%m-%d")
+    
+    # Use GoogleMapsCompatible tile matrix for epsg3857
+    tile_matrix = "GoogleMapsCompatible_Level9" if projection == "epsg3857" else "250m"
+    
     return (
-        f"https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/"
-        f"{layer}/default/{date_str}/250m/{z}/{y}/{x}.jpg"
+        f"https://gibs.earthdata.nasa.gov/wmts/{projection}/best/"
+        f"{layer}/default/{date_str}/{tile_matrix}/{{z}}/{{y}}/{{x}}.jpg"
     )
 
-def generate_thumbnail_url(layer: str, date: date) -> str:
-    """Generate thumbnail URL (simplified)"""
+def generate_thumbnail_url(layer: str, date: date, projection: str = "epsg3857") -> str:
+    """Generate thumbnail URL at zoom level 0"""
     date_str = date.strftime("%Y-%m-%d")
+    
+    # Use GoogleMapsCompatible tile matrix for epsg3857
+    tile_matrix = "GoogleMapsCompatible_Level9" if projection == "epsg3857" else "250m"
+    
     return (
-        f"https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/"
-        f"{layer}/default/{date_str}/250m/0/0/0.jpg"
+        f"https://gibs.earthdata.nasa.gov/wmts/{projection}/best/"
+        f"{layer}/default/{date_str}/{tile_matrix}/0/0/0.jpg"
     )
 
 # ============================================================================
@@ -164,8 +180,10 @@ def search_images(query: ImageSearchQuery):
             layer=query.layer.value,
             date=current_date,
             bbox=bbox,
-            tile_url=generate_gibs_url(query.layer.value, current_date, 0, 0, 0),
-            thumbnail_url=generate_thumbnail_url(query.layer.value, current_date),
+            tile_url=generate_gibs_url_template(query.layer.value, current_date, query.projection),
+            thumbnail_url=generate_thumbnail_url(query.layer.value, current_date, query.projection),
+            projection=query.projection,
+            max_zoom=9,  # GIBS supports up to zoom level 9 for most layers
             description=f"{query.layer.value} imagery from {current_date}"
         ))
         

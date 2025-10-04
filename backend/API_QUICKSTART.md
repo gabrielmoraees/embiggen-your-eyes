@@ -1,44 +1,35 @@
-# API Quick Start Guide
+# API Quick Reference
 
-## 🚀 Getting Started in 30 Seconds
+## 🚀 Quick Start
 
 ```bash
-# 1. Install dependencies
 pip install -r requirements.txt
-
-# 2. Start server
 python main.py
-
-# 3. Open API docs
-open http://localhost:8000/docs
+# API Docs: http://localhost:8000/docs
 ```
 
-## 📡 API Endpoints at a Glance
+## 📡 Endpoints
 
-```
-BASE URL: http://localhost:8000
-```
+**Base URL:** `http://localhost:8000`
 
-### Core Workflows
-
-#### 🔍 Workflow 1: Search & Display Images
+### Search & Display
 
 ```javascript
-// 1. Search for images
 POST /api/search/images
 {
   "layer": "MODIS_Terra_CorrectedReflectance_TrueColor",
-  "date_start": "2024-09-01",
-  "date_end": "2024-10-01",
+  "date_start": "2024-10-01",
+  "date_end": "2024-10-04",
+  "projection": "epsg3857",  // or "epsg4326"
   "limit": 10
 }
-→ Returns: Array of ImageMetadata with NASA GIBS tile URLs
 
-// 2. Display in Leaflet (frontend)
-L.tileLayer(image.tile_url).addTo(map);
+// Response includes tile_url with {z}/{x}/{y} template
+// Use directly with Leaflet/OpenLayers
+L.tileLayer(image.tile_url, { maxZoom: image.max_zoom }).addTo(map);
 ```
 
-#### ✏️ Workflow 2: Annotate Images
+### Annotations
 
 ```javascript
 // 1. Create annotation
@@ -60,7 +51,7 @@ GET /api/annotations/image/{image_id}
 → Returns: Array of Annotations
 ```
 
-#### 🔗 Workflow 3: Link Related Images
+### Image Links
 
 ```javascript
 // 1. Create link between images
@@ -78,7 +69,7 @@ GET /api/links/graph/{image_id}?depth=2
 → Returns: Tree structure of all linked images
 ```
 
-#### 📚 Workflow 4: Create Collections
+### Collections
 
 ```javascript
 // 1. Create collection
@@ -96,7 +87,7 @@ PUT /api/collections/{collection_id}/images
 → Returns: Updated Collection
 ```
 
-#### 🔄 Workflow 5: Compare Images
+### Image Comparison
 
 ```javascript
 // 1. Prepare comparison

@@ -20,11 +20,33 @@ def example_search_images():
         "layer": "MODIS_Terra_CorrectedReflectance_TrueColor",
         "date_start": str(date.today() - timedelta(days=30)),
         "date_end": str(date.today()),
+        "projection": "epsg3857",  # Web Mercator for standard web maps
         "limit": 5
     })
     
     images = response.json()
     print(f"Found {len(images)} images")
+    
+    # Verify tile URL format
+    first_image = images[0]
+    print(f"\n🔍 Verifying tile URL format:")
+    print(f"   tile_url: {first_image['tile_url']}")
+    
+    has_placeholders = "{z}" in first_image['tile_url'] and "{x}" in first_image['tile_url'] and "{y}" in first_image['tile_url']
+    print(f"   Contains {{z}}/{{x}}/{{y}} placeholders: {'✅ YES' if has_placeholders else '❌ NO'}")
+    print(f"   projection: {first_image.get('projection', 'MISSING')}")
+    print(f"   max_zoom: {first_image.get('max_zoom', 'MISSING')}")
+    
+    # Show example tile URLs at different zoom levels
+    if has_placeholders:
+        print(f"\n📍 Example tile URLs at different zoom levels:")
+        for z, x, y in [(0, 0, 0), (2, 1, 1), (5, 10, 10)]:
+            tile = (first_image['tile_url']
+                   .replace('{z}', str(z))
+                   .replace('{x}', str(x))
+                   .replace('{y}', str(y)))
+            print(f"   Zoom {z}: {tile}")
+    
     pretty_print(images[:2])  # Show first 2
     
     return images
