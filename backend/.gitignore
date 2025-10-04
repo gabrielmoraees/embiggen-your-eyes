@@ -38,3 +38,5 @@ wheels/
 .DS_Store
 Thumbs.db
 
+# Tile Processing
+tiles_cache/
