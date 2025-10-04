@@ -12,6 +12,41 @@ python main.py
 
 **Base URL:** `http://localhost:8000`
 
+### Get Available Layers
+
+```javascript
+GET /api/layers
+
+// Response
+{
+  "layers": [
+    {
+      "id": "VIIRS_TRUE_COLOR",
+      "value": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+      "display_name": "Viirs True Color",
+      "satellite": "VIIRS SNPP",
+      "type": "True Color (Natural)",
+      "description": "VIIRS SNPP - True Color (Natural)"
+    },
+    // ... more layers
+  ],
+  "total": 4
+}
+
+// Usage in frontend
+const response = await fetch('/api/layers');
+const data = await response.json();
+
+// Populate dropdown
+data.layers.forEach(layer => {
+  const option = document.createElement('option');
+  option.value = layer.value;  // Use for search
+  option.textContent = layer.description;  // Display to user
+  select.appendChild(option);
+});
+```
+
+
 ### Search & Display
 
 ```javascript

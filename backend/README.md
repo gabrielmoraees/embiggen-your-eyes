@@ -48,6 +48,7 @@ Once running, visit:
 
 ### Search & Discovery
 ```
+GET    /api/layers                   Get available NASA GIBS layers
 POST   /api/search/images          Search for imagery
 GET    /api/search/history          View search history
 POST   /api/images/compare          Prepare images for comparison
