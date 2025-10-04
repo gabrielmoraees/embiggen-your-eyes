@@ -24,7 +24,12 @@ const AppState = {
     compareMode: 'overlay',
     compareImages: [],
     searchHistory: [],
-    suggestions: []
+    suggestions: [],
+    // Drawing state
+    drawingMode: null, // 'marker', 'path', 'rectangle', 'circle'
+    drawingPath: [],
+    drawingStart: null,
+    tempDrawing: null
 };
 
 // ============================================================================
@@ -96,13 +101,13 @@ function initializeMap() {
     
     try {
         map = L.map('map', {
-            center: [0, 0],
-            zoom: 2,
-            minZoom: 1,
+    center: [0, 0],
+    zoom: 2,
+    minZoom: 1,
             maxZoom: 12,
             zoomControl: false,
-            attributionControl: true
-        });
+    attributionControl: true
+});
 
         map.attributionControl.setPosition('bottomright');
         map.attributionControl.setPrefix('');
@@ -121,6 +126,10 @@ function initializeMap() {
                 zoomEl.textContent = `Zoom: ${map.getZoom()}`;
             }
         });
+        
+        // Map click handler for drawing
+        map.on('click', handleMapClick);
+        map.on('mousemove', handleMapMouseMove);
         
         console.log('✅ Map initialized');
         return true;
@@ -184,6 +193,10 @@ async function loadAnnotations(imageId) {
     try {
         const annotations = await apiRequest(`/api/annotations/image/${imageId}`);
         AppState.annotations = annotations;
+        
+        // Display all annotations on map
+        annotations.forEach(ann => displayAnnotationOnMap(ann));
+        
         renderAnnotationsList(annotations);
         return annotations;
     } catch (error) {
@@ -192,7 +205,7 @@ async function loadAnnotations(imageId) {
     }
 }
 
-async function createAnnotation(imageId, type, coordinates, text, color = '#007AFF') {
+async function createAnnotation(imageId, type, coordinates, text, color = '#007AFF', properties = {}) {
     try {
         const annotation = await apiRequest('/api/annotations', {
             method: 'POST',
@@ -201,7 +214,8 @@ async function createAnnotation(imageId, type, coordinates, text, color = '#007A
                 type: type,
                 coordinates: coordinates,
                 text: text,
-                color: color
+                color: color,
+                properties: properties
             })
         });
         
@@ -219,6 +233,12 @@ async function deleteAnnotation(annotationId) {
         await apiRequest(`/api/annotations/${annotationId}`, {
             method: 'DELETE'
         });
+        
+        // Find and remove from map
+        const annotation = AppState.annotations.find(a => a.id === annotationId);
+        if (annotation && annotation._leafletLayer) {
+            map.removeLayer(annotation._leafletLayer);
+        }
         
         AppState.annotations = AppState.annotations.filter(a => a.id !== annotationId);
         renderAnnotationsList(AppState.annotations);
@@ -319,7 +339,7 @@ async function updateBaseLayer() {
     
     // Remove old base layer
     if (gibsLayer) {
-        map.removeLayer(gibsLayer);
+    map.removeLayer(gibsLayer);
     }
     
     // Create new base layer
@@ -342,6 +362,349 @@ async function updateBaseLayer() {
     }
     
     console.log(`Loaded image: ${imageMetadata.id}`);
+}
+
+// ============================================================================
+// Drawing & Annotation Functions
+// ============================================================================
+
+function handleMapClick(e) {
+    if (!AppState.drawingMode || !AppState.currentImage) return;
+    
+    const latlng = e.latlng;
+    
+    switch (AppState.drawingMode) {
+        case 'marker':
+            createMarkerAnnotation(latlng);
+            exitDrawingMode();
+            break;
+            
+        case 'path':
+            addPathPoint(latlng);
+            break;
+            
+        case 'rectangle':
+            if (!AppState.drawingStart) {
+                startRectangle(latlng);
+            } else {
+                finishRectangle(latlng);
+            }
+            break;
+            
+        case 'circle':
+            if (!AppState.drawingStart) {
+                startCircle(latlng);
+            } else {
+                finishCircle(latlng);
+            }
+            break;
+    }
+}
+
+function handleMapMouseMove(e) {
+    if (!AppState.drawingMode || !AppState.drawingStart) return;
+    
+    const latlng = e.latlng;
+    
+    switch (AppState.drawingMode) {
+        case 'rectangle':
+            updateRectanglePreview(latlng);
+            break;
+            
+        case 'circle':
+            updateCirclePreview(latlng);
+            break;
+    }
+}
+
+// Marker annotation
+async function createMarkerAnnotation(latlng) {
+    const name = prompt('Marker name (optional):') || `Marker ${Date.now()}`;
+    
+    const annotation = await createAnnotation(
+        AppState.currentImage.id,
+        'point',
+        [{lat: latlng.lat, lng: latlng.lng}],
+        name,
+        '#007AFF'
+    );
+    
+    if (annotation) {
+        displayAnnotationOnMap(annotation);
+        showStatus('Marker added', 'success');
+    }
+}
+
+// Path builder (replaces polygon)
+function addPathPoint(latlng) {
+    AppState.drawingPath.push(latlng);
+    
+    // Visual feedback - show path so far
+    if (AppState.tempDrawing) {
+        map.removeLayer(AppState.tempDrawing);
+    }
+    
+    if (AppState.drawingPath.length > 1) {
+        AppState.tempDrawing = L.polyline(
+            AppState.drawingPath.map(p => [p.lat, p.lng]),
+            {
+                color: '#007AFF',
+                weight: 3,
+                opacity: 0.7,
+                dashArray: '5, 10'
+            }
+        ).addTo(map);
+    }
+    
+    // Add temporary marker for this point
+    L.circleMarker([latlng.lat, latlng.lng], {
+        radius: 5,
+        fillColor: '#007AFF',
+        fillOpacity: 1,
+        color: 'white',
+        weight: 2
+    }).addTo(map);
+    
+    // Show instruction
+    showStatus(`Path: ${AppState.drawingPath.length} points (double-click to finish)`, 'info');
+}
+
+async function finishPath() {
+    if (AppState.drawingPath.length < 2) {
+        showStatus('Path needs at least 2 points', 'warning');
+        exitDrawingMode();
+        return;
+    }
+    
+    const name = prompt('Path name (optional):') || `Path ${Date.now()}`;
+    
+    const coordinates = AppState.drawingPath.map(p => ({lat: p.lat, lng: p.lng}));
+    
+    const annotation = await createAnnotation(
+        AppState.currentImage.id,
+        'polygon',
+        coordinates,
+        name,
+        '#007AFF'
+    );
+    
+    if (annotation) {
+        displayAnnotationOnMap(annotation);
+        showStatus('Path created', 'success');
+    }
+    
+    exitDrawingMode();
+}
+
+// Rectangle
+function startRectangle(latlng) {
+    AppState.drawingStart = latlng;
+    showStatus('Click to set opposite corner', 'info');
+}
+
+function updateRectanglePreview(latlng) {
+    if (AppState.tempDrawing) {
+        map.removeLayer(AppState.tempDrawing);
+    }
+    
+    const bounds = [
+        [AppState.drawingStart.lat, AppState.drawingStart.lng],
+        [latlng.lat, latlng.lng]
+    ];
+    
+    AppState.tempDrawing = L.rectangle(bounds, {
+        color: '#007AFF',
+        weight: 2,
+        opacity: 0.7,
+        fillOpacity: 0.2,
+        dashArray: '5, 10'
+    }).addTo(map);
+}
+
+async function finishRectangle(latlng) {
+    const name = prompt('Rectangle name (optional):') || `Rectangle ${Date.now()}`;
+    
+    const coordinates = [
+        {lat: AppState.drawingStart.lat, lng: AppState.drawingStart.lng},
+        {lat: latlng.lat, lng: latlng.lng}
+    ];
+    
+    const annotation = await createAnnotation(
+        AppState.currentImage.id,
+        'rectangle',
+        coordinates,
+        name,
+        '#007AFF'
+    );
+    
+    if (annotation) {
+        displayAnnotationOnMap(annotation);
+        showStatus('Rectangle created', 'success');
+    }
+    
+    exitDrawingMode();
+}
+
+// Circle
+function startCircle(latlng) {
+    AppState.drawingStart = latlng;
+    showStatus('Click to set radius', 'info');
+}
+
+function updateCirclePreview(latlng) {
+    if (AppState.tempDrawing) {
+        map.removeLayer(AppState.tempDrawing);
+    }
+    
+    const radius = AppState.drawingStart.distanceTo(latlng);
+    
+    AppState.tempDrawing = L.circle(
+        [AppState.drawingStart.lat, AppState.drawingStart.lng],
+        {
+            radius: radius,
+            color: '#007AFF',
+            weight: 2,
+            opacity: 0.7,
+            fillOpacity: 0.2,
+            dashArray: '5, 10'
+        }
+    ).addTo(map);
+}
+
+async function finishCircle(latlng) {
+    const radius = AppState.drawingStart.distanceTo(latlng);
+    const name = prompt('Circle name (optional):') || `Circle ${Date.now()}`;
+    
+    const coordinates = [
+        {lat: AppState.drawingStart.lat, lng: AppState.drawingStart.lng}
+    ];
+    
+    const annotation = await createAnnotation(
+        AppState.currentImage.id,
+        'circle',
+        coordinates,
+        name,
+        '#007AFF',
+        {radius: radius}
+    );
+    
+    if (annotation) {
+        displayAnnotationOnMap(annotation);
+        showStatus('Circle created', 'success');
+    }
+    
+    exitDrawingMode();
+}
+
+function displayAnnotationOnMap(annotation) {
+    let layer;
+    
+    if (annotation.type === 'point') {
+        layer = L.circleMarker(
+            [annotation.coordinates[0].lat, annotation.coordinates[0].lng],
+            {
+                radius: 8,
+                fillColor: annotation.color,
+                fillOpacity: 0.8,
+                color: 'white',
+                weight: 2
+            }
+        );
+    } else if (annotation.type === 'polygon') {
+        const coords = annotation.coordinates.map(c => [c.lat, c.lng]);
+        layer = L.polyline(coords, {
+            color: annotation.color,
+            weight: 3,
+            opacity: 0.8
+        });
+    } else if (annotation.type === 'rectangle') {
+        const bounds = [
+            [annotation.coordinates[0].lat, annotation.coordinates[0].lng],
+            [annotation.coordinates[1].lat, annotation.coordinates[1].lng]
+        ];
+        layer = L.rectangle(bounds, {
+            color: annotation.color,
+            weight: 2,
+            opacity: 0.8,
+            fillOpacity: 0.2
+        });
+    } else if (annotation.type === 'circle') {
+        layer = L.circle(
+            [annotation.coordinates[0].lat, annotation.coordinates[0].lng],
+            {
+                radius: annotation.properties.radius || 10000,
+                color: annotation.color,
+                weight: 2,
+                opacity: 0.8,
+                fillOpacity: 0.2
+            }
+        );
+    }
+    
+    if (layer) {
+        layer.bindPopup(`
+            <div style="font-family: -apple-system, sans-serif;">
+                <strong>${annotation.text || 'Annotation'}</strong><br>
+                <small style="color: #666;">Type: ${annotation.type}</small>
+            </div>
+        `);
+        layer.addTo(map);
+        
+        // Store reference for cleanup
+        if (!annotation._leafletLayer) {
+            annotation._leafletLayer = layer;
+        }
+    }
+}
+
+function enterDrawingMode(mode) {
+    // Exit any previous mode
+    exitDrawingMode();
+    
+    AppState.drawingMode = mode;
+    map.getContainer().style.cursor = 'crosshair';
+    
+    const messages = {
+        marker: 'Click on map to place marker',
+        path: 'Click points to build path (double-click to finish)',
+        rectangle: 'Click to set first corner',
+        circle: 'Click to set center'
+    };
+    
+    showStatus(messages[mode] || 'Drawing mode active', 'info');
+    
+    // Update tool button states
+    updateToolButtonStates();
+}
+
+function exitDrawingMode() {
+    // Clean up temp drawing
+    if (AppState.tempDrawing) {
+        map.removeLayer(AppState.tempDrawing);
+        AppState.tempDrawing = null;
+    }
+    
+    AppState.drawingMode = null;
+    AppState.drawingPath = [];
+    AppState.drawingStart = null;
+    map.getContainer().style.cursor = '';
+    
+    // Update tool button states
+    updateToolButtonStates();
+}
+
+function updateToolButtonStates() {
+    const toolButtons = document.querySelectorAll('.tool-btn');
+    toolButtons.forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    if (AppState.drawingMode) {
+        const activeBtn = document.getElementById(`tool-${AppState.drawingMode}`);
+        if (activeBtn) {
+            activeBtn.classList.add('active');
+        }
+    }
 }
 
 async function addOverlayLayer(layer) {
@@ -449,16 +812,24 @@ function renderAnnotationsList(annotations) {
     annotationsList.innerHTML = '';
     
     if (annotations.length === 0) {
-        annotationsList.innerHTML = '<div class="panel-desc">No annotations yet</div>';
+        annotationsList.innerHTML = '<div class="panel-desc">No annotations yet. Use tools above to add annotations.</div>';
         return;
     }
     
     annotations.forEach(ann => {
+        const icons = {
+            point: 'place',
+            polygon: 'timeline',
+            rectangle: 'crop_square',
+            circle: 'circle'
+        };
+        
         const item = document.createElement('div');
         item.className = 'list-item';
+        item.style.cursor = 'pointer';
         item.innerHTML = `
             <div class="list-item-icon">
-                <span class="material-icons-round">place</span>
+                <span class="material-icons-round">${icons[ann.type] || 'place'}</span>
             </div>
             <div class="list-item-info">
                 <div class="list-item-title">${ann.text || 'Annotation'}</div>
@@ -468,6 +839,19 @@ function renderAnnotationsList(annotations) {
                 <span class="material-icons-round">delete</span>
             </button>
         `;
+        
+        // Click to focus on annotation
+        item.addEventListener('click', (e) => {
+            if (!e.target.closest('.icon-btn') && ann._leafletLayer) {
+                if (ann.type === 'point') {
+                    map.setView([ann.coordinates[0].lat, ann.coordinates[0].lng], Math.max(map.getZoom(), 6));
+                } else {
+                    map.fitBounds(ann._leafletLayer.getBounds(), {padding: [50, 50]});
+                }
+                ann._leafletLayer.openPopup();
+            }
+        });
+        
         annotationsList.appendChild(item);
     });
 }
@@ -624,11 +1008,57 @@ function initializeEventListeners() {
     // Tool buttons
     document.getElementById('tool-marker').addEventListener('click', () => {
         if (AppState.currentImage) {
-            const coords = prompt('Enter coordinates (lat,lng):');
-            if (coords) {
-                const [lat, lng] = coords.split(',').map(s => parseFloat(s.trim()));
-                createAnnotation(AppState.currentImage.id, 'point', [{lat, lng}], 'Marker');
+            if (AppState.drawingMode === 'marker') {
+                exitDrawingMode();
+            } else {
+                enterDrawingMode('marker');
             }
+        } else {
+            showStatus('Select a celestial body and layer first', 'warning');
+        }
+    });
+    
+    document.getElementById('tool-path').addEventListener('click', () => {
+        if (AppState.currentImage) {
+            if (AppState.drawingMode === 'path') {
+                exitDrawingMode();
+            } else {
+                enterDrawingMode('path');
+            }
+        } else {
+            showStatus('Select a celestial body and layer first', 'warning');
+        }
+    });
+    
+    document.getElementById('tool-rectangle').addEventListener('click', () => {
+        if (AppState.currentImage) {
+            if (AppState.drawingMode === 'rectangle') {
+                exitDrawingMode();
+            } else {
+                enterDrawingMode('rectangle');
+            }
+        } else {
+            showStatus('Select a celestial body and layer first', 'warning');
+        }
+    });
+    
+    document.getElementById('tool-circle').addEventListener('click', () => {
+        if (AppState.currentImage) {
+            if (AppState.drawingMode === 'circle') {
+                exitDrawingMode();
+            } else {
+                enterDrawingMode('circle');
+            }
+        } else {
+            showStatus('Select a celestial body and layer first', 'warning');
+        }
+    });
+    
+    // Double-click to finish path
+    map.on('dblclick', (e) => {
+        L.DomEvent.stop(e);
+        if (AppState.drawingMode === 'path' && AppState.drawingPath.length >= 2) {
+            finishPath();
         }
     });
 }
