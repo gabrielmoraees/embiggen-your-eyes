@@ -6,8 +6,10 @@ from typing import Optional
 from datetime import date
 
 from app.models.enums import Category, Subject, SourceId
+from app.models.schemas import DatasetCreateRequest
 from app.services.catalog_service import CatalogService
 from app.services.variant_service import VariantService
+from app.services.dataset_service import DatasetService
 
 router = APIRouter()
 
@@ -22,6 +24,25 @@ def get_categories():
 def get_sources(category: Optional[Category] = None, subject: Optional[Subject] = None):
     """Get list of sources, optionally filtered by category or subject"""
     return CatalogService.get_sources(category, subject)
+
+
+@router.post("/datasets")
+def create_dataset(request: DatasetCreateRequest):
+    """
+    Create a new dataset from URL
+    
+    The URL can be either:
+    - A tile service URL (with {z}/{x}/{y} or {bbox} placeholders)
+    - An image file URL (.jpg, .png, .tif, etc.)
+    
+    The endpoint automatically detects the type and processes accordingly.
+    """
+    result = DatasetService.create_dataset(request)
+    
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Failed to create dataset"))
+    
+    return result
 
 
 @router.get("/datasets")

@@ -29,6 +29,15 @@ def initialize_catalog():
         terms_of_use="Public domain"
     )
     
+    SOURCES[SourceId.CUSTOM] = Source(
+        id=SourceId.CUSTOM,
+        name="User Provided",
+        description="User-uploaded custom imagery and datasets",
+        attribution="User Provided",
+        url=None,
+        terms_of_use="User-defined"
+    )
+    
     SOURCES[SourceId.OPENPLANETARYMAP] = Source(
         id=SourceId.OPENPLANETARYMAP,
         name="OpenPlanetaryMap",

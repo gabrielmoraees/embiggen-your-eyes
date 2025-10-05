@@ -133,3 +133,12 @@ class Collection(BaseModel):
     view_ids: List[str] = []
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+
+class DatasetCreateRequest(BaseModel):
+    """Request to create a new dataset"""
+    name: str
+    description: Optional[str] = None
+    category: Category
+    subject: Subject
+    url: str  # Can be tile service URL or image URL
