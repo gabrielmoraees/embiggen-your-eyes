@@ -107,6 +107,8 @@ class TileProcessor:
     def generate_tiles(self, image_path: Path, tile_id: str) -> Tuple[Path, int]:
         """
         Generate tile pyramid using GDAL's gdal2tiles.py
+        Expects a georeferenced image (EPSG:4326 with world bounds)
+        Calculates optimal zoom levels based on image dimensions
         Returns: (tiles_directory, max_zoom_level)
         """
         logger.info(f"Generating tiles for {image_path}")
@@ -119,30 +121,97 @@ class TileProcessor:
             # Try common locations for gdal2tiles
             gdal2tiles_cmd = self._find_gdal2tiles()
             
-            # Run gdal2tiles with raster profile (for non-georeferenced images)
-            # Deep space images don't have geospatial metadata, so use raster profile
-            # Use --xyz to generate tiles in XYZ/TMS format that Leaflet expects
+            # Use absolute paths to avoid path resolution issues
+            abs_image_path = image_path.resolve()
+            abs_output_dir = output_dir.resolve()
+            
+            # Calculate optimal zoom levels based on image size
+            # Use gdalinfo to get image dimensions
+            gdalinfo_result = subprocess.run(
+                ['gdalinfo', str(abs_image_path)],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            # Parse image dimensions from gdalinfo output
+            import re
+            size_match = re.search(r'Size is (\d+), (\d+)', gdalinfo_result.stdout)
+            if size_match:
+                width = int(size_match.group(1))
+                height = int(size_match.group(2))
+                
+                # Calculate max zoom based on largest dimension
+                # At zoom 0, we have 256x256 pixels for the world
+                # Each zoom level doubles the resolution
+                # max_zoom = log2(max_dimension / 256)
+                import math
+                max_dimension = max(width, height)
+                calculated_max_zoom = math.ceil(math.log2(max_dimension / 256))
+                
+                # Clamp between reasonable values (0-12)
+                max_zoom = max(0, min(12, calculated_max_zoom))
+                
+                logger.info(f"Image size: {width}x{height}, calculated max zoom: {max_zoom}")
+            else:
+                # Fallback if we can't parse dimensions
+                max_zoom = 8
+                logger.warning(f"Could not determine image size, using default max_zoom={max_zoom}")
+            
+            # Generate tiles from georeferenced image
             cmd = [
                 gdal2tiles_cmd,
-                '--profile=raster',  # Raster profile for non-georeferenced images
-                '--xyz',             # Generate XYZ tiles (compatible with Leaflet)
-                '--zoom=0-8',        # Reasonable zoom range for web
-                '--processes=4',     # Use multiple cores
-                '--webviewer=none',  # Don't generate viewer HTML
-                str(image_path),
-                str(output_dir)
+                '--profile=mercator',  # Mercator profile for web display
+                '--xyz',               # XYZ tile scheme (Leaflet-compatible, not TMS)
+                f'--zoom=0-{max_zoom}',  # Dynamic zoom range based on image size
+                '--processes=4',       # Use multiple cores
+                '--webviewer=none',    # Don't generate viewer HTML
+                str(abs_image_path),
+                str(abs_output_dir)
             ]
             
             logger.info(f"Running: {' '.join(cmd)}")
-            result = subprocess.run(
+            
+            # Run gdal2tiles in a subprocess and monitor progress
+            process = subprocess.Popen(
                 cmd,
-                capture_output=True,
-                text=True,
-                timeout=600  # 10 minute timeout
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
             )
             
-            if result.returncode != 0:
-                raise RuntimeError(f"gdal2tiles failed: {result.stderr}")
+            # Monitor progress by counting generated tiles
+            import time
+            start_time = time.time()
+            last_count = 0
+            
+            while process.poll() is None:
+                # Check how many tiles have been generated
+                if output_dir.exists():
+                    tile_count = sum(1 for _ in output_dir.rglob('*.png'))
+                    
+                    # Estimate progress (rough estimate: 87k tiles for Andromeda)
+                    # Progress from 40% to 95% during tile generation
+                    estimated_total = 100000  # Rough estimate
+                    progress_pct = 40 + int((tile_count / estimated_total) * 55)
+                    progress_pct = min(95, progress_pct)  # Cap at 95%
+                    
+                    if tile_count != last_count:
+                        # Use the tile_id parameter passed to this method
+                        if tile_id in self.processing_status:
+                            self.processing_status[tile_id].update({
+                                "percentage": progress_pct,
+                                "message": f"Generating tiles... {tile_count:,} tiles created"
+                            })
+                        last_count = tile_count
+                
+                time.sleep(2)  # Check every 2 seconds
+            
+            # Get any remaining output
+            stdout, stderr = process.communicate()
+            
+            if process.returncode != 0:
+                raise RuntimeError(f"gdal2tiles failed: {stderr}")
             
             # Determine max zoom from generated directories
             max_zoom = self._get_max_zoom(output_dir)
@@ -194,11 +263,18 @@ class TileProcessor:
         logger.error(error_msg)
         raise RuntimeError(error_msg)
     
+    def _get_min_zoom(self, tiles_dir: Path) -> int:
+        """Determine minimum zoom level from generated tiles"""
+        zoom_dirs = [d for d in tiles_dir.iterdir() if d.is_dir() and d.name.isdigit()]
+        if not zoom_dirs:
+            return 0  # Default fallback
+        return min(int(d.name) for d in zoom_dirs)
+    
     def _get_max_zoom(self, tiles_dir: Path) -> int:
         """Determine maximum zoom level from generated tiles"""
         zoom_dirs = [d for d in tiles_dir.iterdir() if d.is_dir() and d.name.isdigit()]
         if not zoom_dirs:
-            return 5  # Default fallback
+            return 8  # Default fallback
         return max(int(d.name) for d in zoom_dirs)
     
     def queue_processing(self, image_url: str, metadata: Dict):
@@ -224,16 +300,20 @@ class TileProcessor:
         }
         
         # Start background thread
+        # Note: daemon=False so thread can complete even if main process reloads
         thread = threading.Thread(
             target=self._process_image_background,
             args=(image_url, metadata),
-            daemon=True
+            daemon=False
         )
         thread.start()
         logger.info(f"Queued processing for {tile_id}")
     
     def _process_image_background(self, image_url: str, metadata: Dict):
-        """Background worker that processes the image"""
+        """
+        Background worker that processes the image
+        Resumable at any step: download, georeference, or tile generation
+        """
         tile_id = self._generate_tile_id(image_url)
         
         try:
@@ -246,36 +326,96 @@ class TileProcessor:
                 "message": "Queued for processing..."
             }
             
-            # Step 1: Download image (0-30%)
+            # Determine file extension
+            ext = Path(image_url).suffix or '.tif'
+            image_path = self.downloads_dir / f"{tile_id}{ext}"
+            georef_path = self.downloads_dir / f"{tile_id}_georef.tif"
+            tiles_dir = self.tiles_dir / tile_id
+            
+            # Step 1: Download image (0-20%) - Skip if already downloaded
+            if not image_path.exists():
+                self.processing_status[tile_id].update({
+                    "progress": "downloading",
+                    "percentage": 0,
+                    "message": "Downloading image..."
+                })
+                image_path = self.download_image(image_url, tile_id)
+                logger.info(f"Download complete: {image_path}")
+            else:
+                logger.info(f"Download already exists, skipping: {image_path}")
+            
             self.processing_status[tile_id].update({
-                "progress": "downloading",
-                "percentage": 0,
-                "message": "Starting download..."
+                "percentage": 20,
+                "message": "Download complete"
             })
             
-            image_path = self.download_image(image_url, tile_id)
+            # Step 2: Georeference image (20-40%) - Skip if already georeferenced
+            if not georef_path.exists():
+                self.processing_status[tile_id].update({
+                    "progress": "georeferencing",
+                    "percentage": 20,
+                    "message": "Georeferencing image to world bounds..."
+                })
+                
+                logger.info(f"Georeferencing image to world bounds...")
+                georef_cmd = [
+                    'gdal_translate',
+                    '-of', 'GTiff',
+                    '-a_srs', 'EPSG:4326',
+                    '-a_ullr', '-180', '90', '180', '-90',
+                    str(image_path.resolve()),
+                    str(georef_path.resolve())
+                ]
+                
+                georef_result = subprocess.run(
+                    georef_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=300
+                )
+                
+                if georef_result.returncode != 0:
+                    raise RuntimeError(f"gdal_translate failed: {georef_result.stderr}")
+                
+                logger.info(f"Georeferencing complete: {georef_path}")
+            else:
+                logger.info(f"Georeferenced file already exists, skipping: {georef_path}")
             
-            # Step 2: Generate tiles (30-100%)
             self.processing_status[tile_id].update({
-                "progress": "generating_tiles",
-                "percentage": 30,
-                "message": "Generating tiles... This may take a few minutes."
+                "percentage": 40,
+                "message": "Georeferencing complete"
             })
             
-            tiles_dir, max_zoom = self.generate_tiles(image_path, tile_id)
+            # Step 3: Generate tiles (40-100%) - Skip if tiles already exist
+            if not tiles_dir.exists() or not any(tiles_dir.iterdir()):
+                self.processing_status[tile_id].update({
+                    "progress": "generating_tiles",
+                    "percentage": 40,
+                    "message": "Generating tiles... This may take several minutes."
+                })
+                
+                tiles_dir, max_zoom = self.generate_tiles(georef_path, tile_id)
+                logger.info(f"Tile generation complete: {tiles_dir}")
+            else:
+                logger.info(f"Tiles already exist, skipping generation: {tiles_dir}")
+                max_zoom = self._get_max_zoom(tiles_dir)
             
-            # Step 3: Finalizing (95%)
+            # Get min zoom from generated tiles
+            min_zoom = self._get_min_zoom(tiles_dir)
+            
+            # Step 4: Finalizing (95%)
             self.processing_status[tile_id].update({
                 "progress": "finalizing",
                 "percentage": 95,
                 "message": "Finalizing..."
             })
             
-            # Step 4: Update index
+            # Step 5: Update index
             tile_info = {
                 "tile_id": tile_id,
                 "source_url": image_url,
                 "tiles_path": str(tiles_dir.relative_to(self.tiles_dir)),
+                "min_zoom": min_zoom,
                 "max_zoom": max_zoom,
                 "status": "completed",
                 "metadata": metadata,
@@ -289,14 +429,9 @@ class TileProcessor:
             self.processing_status[tile_id].update({
                 "progress": "completed",
                 "percentage": 100,
-                "message": "Processing complete!"
+                "message": "Processing complete!",
+                "status": "completed"
             })
-            
-            # Clear processing status after a short delay
-            import time
-            time.sleep(2)
-            if tile_id in self.processing_status:
-                del self.processing_status[tile_id]
             
             logger.info(f"Processing completed for {tile_id}")
             
@@ -306,6 +441,8 @@ class TileProcessor:
             
         except Exception as e:
             logger.error(f"Processing failed for {tile_id}: {e}")
+            import traceback
+            traceback.print_exc()
             self.processing_status[tile_id] = {
                 "status": "failed",
                 "progress": "failed",
@@ -322,11 +459,10 @@ class TileProcessor:
     def _update_dataset_status(self, dataset_id: str, status: str):
         """Update dataset status after processing completes"""
         from app.data.storage import DATASETS
+        from app.models.schemas import Dataset, Variant
         
         if dataset_id in DATASETS:
             dataset = DATASETS[dataset_id]
-            dataset.processing_status = status
-            dataset.updated_at = datetime.now()
             
             # Update tile URL if ready
             if status == "ready" and hasattr(dataset, 'image_url'):
@@ -336,21 +472,60 @@ class TileProcessor:
                         base_url="http://localhost:8000"
                     )
                     tile_id = self._generate_tile_id(dataset.image_url)
-                    thumbnail_url = f"http://localhost:8000/tiles/{tile_id}/0/0/0.png"
                     
-                    # Update variant URLs
+                    # Get zoom levels from tile_info
+                    tile_info = self.tile_index.get(tile_id)
+                    min_zoom = tile_info.get('min_zoom', 0) if tile_info else 0
+                    max_zoom = tile_info.get('max_zoom', 8) if tile_info else 8
+                    
+                    # Thumbnail URL should use the minimum zoom level
+                    thumbnail_url = f"http://localhost:8000/tiles/{tile_id}/{min_zoom}/0/0.png"
+                    
+                    # Update variant with new zoom levels (Pydantic requires creating new objects)
                     if dataset.variants:
-                        dataset.variants[0].tile_url_template = tile_url_template
-                        dataset.variants[0].thumbnail_url = thumbnail_url
+                        old_variant = dataset.variants[0]
+                        new_variant = Variant(
+                            id=old_variant.id,
+                            name=old_variant.name,
+                            description=old_variant.description,
+                            tile_url_template=tile_url_template,
+                            thumbnail_url=thumbnail_url,
+                            min_zoom=min_zoom,
+                            max_zoom=max_zoom,
+                            is_default=old_variant.is_default
+                        )
                         
-                        # Update max_zoom from tile_info
-                        tile_info = self.tile_index.get(tile_id)
-                        if tile_info:
-                            dataset.variants[0].max_zoom = tile_info.get('max_zoom', 8)
+                        # Create new dataset with updated variant (copy all fields)
+                        new_dataset = Dataset(
+                            id=dataset.id,
+                            name=dataset.name,
+                            description=dataset.description,
+                            source_id=dataset.source_id,
+                            category=dataset.category,
+                            subject=dataset.subject,
+                            projection=dataset.projection,
+                            supports_time_series=dataset.supports_time_series,
+                            date_range_start=dataset.date_range_start,
+                            date_range_end=dataset.date_range_end,
+                            default_date=dataset.default_date,
+                            variants=[new_variant],
+                            available_layers=dataset.available_layers,
+                            bbox=dataset.bbox,
+                            created_at=dataset.created_at,
+                            updated_at=datetime.now(),
+                            processing_status=status,
+                            tile_id=dataset.tile_id,
+                            image_url=dataset.image_url
+                        )
+                        
+                        # Replace in storage
+                        DATASETS[dataset_id] = new_dataset
                     
-                    logger.info(f"Updated dataset {dataset_id} to ready status")
+                    logger.info(f"Updated dataset {dataset_id} to ready status with min_zoom={min_zoom}, max_zoom={max_zoom}")
                 except Exception as e:
                     logger.error(f"Failed to update dataset URLs: {e}")
+                    import traceback
+                    logger.error(traceback.format_exc())
     
     def process_image(self, image_url: str, metadata: Dict) -> Dict:
         """
