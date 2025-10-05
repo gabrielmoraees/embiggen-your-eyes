@@ -24,9 +24,14 @@ source venv/bin/activate
 echo "📥 Installing dependencies..."
 pip install -r requirements.txt --quiet
 
-# Run the server
-echo "✅ Starting FastAPI server on http://localhost:8000"
+# Create necessary directories
+echo "📁 Creating necessary directories..."
+mkdir -p tiles_cache downloads
+
+# Run the server with uvicorn
+echo "✅ Starting FastAPI server on http://0.0.0.0:8000"
 echo "📚 API Documentation: http://localhost:8000/docs"
+echo "📍 Press Ctrl+C to stop the server"
 echo ""
-python main.py
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 

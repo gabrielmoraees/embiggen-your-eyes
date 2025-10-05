@@ -26,24 +26,21 @@ The application uses a hierarchical catalog system:
 
 ## 🚀 Quick Start
 
-### Backend (FastAPI)
+### Local Development
+
+#### Backend (FastAPI)
 
 ```bash
 cd backend
 
-# Create virtual environment (first time only)
+# Using the startup script (recommended)
+./run.sh
+
+# Or manually
 python3 -m venv venv
-
-# Activate virtual environment
-source venv/bin/activate  # macOS/Linux
-# or
-venv\Scripts\activate     # Windows
-
-# Install dependencies
+source venv/bin/activate
 pip install -r requirements.txt
-
-# Start server
-uvicorn main:app --host 0.0.0.0 --port 8000
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 # View API docs
 open http://localhost:8000/docs
@@ -53,23 +50,57 @@ Comprehensive REST API for imagery management and analysis.
 
 📖 **Documentation**: `backend/ARCHITECTURE.md` and `backend/DATASET_IMPORT.md`
 
-### Frontend (Vanilla JS + Leaflet)
+#### Frontend (Vanilla JS + Leaflet)
 
 ```bash
 cd frontend
 
-# Start HTTP server (choose one)
+# Using the startup script (recommended)
 ./start.sh
-# or
+
+# Or manually
 python3 -m http.server 8080
-# or
-npx http-server -p 8080
 
 # Open browser
 open http://localhost:8080
 ```
 
 Interactive map viewer with mobile-friendly Material Design UI. Core features complete, advanced features in development.
+
+### ☁️ Deploy to Google Cloud
+
+Deploy to production in 5 minutes using Google Cloud Run:
+
+```bash
+# Prerequisites: Install gcloud CLI
+brew install google-cloud-sdk
+gcloud auth login
+
+# Set your project ID
+export GCP_PROJECT_ID="your-project-id"
+
+# Deploy everything (backend + frontend)
+./deploy-gcp.sh
+```
+
+**What you get:**
+- ✅ Fully managed, auto-scaling infrastructure
+- ✅ HTTPS enabled by default
+- ✅ Pay only for actual usage (~$20-50/month)
+- ✅ Automatic health checks and logging
+- ✅ Cloud Storage for persistent tiles
+
+**After deployment:**
+```
+🎉 Deployment Complete!
+🌐 Frontend: https://embiggen-frontend-xxxxx.run.app
+🔧 Backend:  https://embiggen-backend-xxxxx.run.app
+```
+
+📖 **Full deployment guide**: See deployment files in the repository
+- `deploy-gcp.sh` - Automated deployment script
+- `backend/Dockerfile` - Backend container configuration
+- `frontend/Dockerfile` - Frontend container configuration
 
 ## 🎨 Architecture
 

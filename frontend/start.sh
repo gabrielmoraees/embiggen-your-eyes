@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Embiggen Your Eyes - Quick Start Script
+# Embiggen Your Eyes - Frontend Startup Script
 # NASA Space Apps Challenge 2025
 
 echo "=================================="
@@ -11,7 +11,7 @@ echo ""
 
 # Check if we're in the right directory
 if [ ! -f "index.html" ]; then
-    echo "Error: index.html not found. Please run this script from the frontend directory."
+    echo "❌ Error: index.html not found. Please run this script from the frontend directory."
     exit 1
 fi
 
@@ -24,7 +24,7 @@ check_port() {
     fi
 }
 
-PORT=8000
+PORT=8080
 
 # Check if port is already in use
 if check_port $PORT; then
@@ -36,8 +36,16 @@ fi
 echo "Starting development server on port $PORT..."
 echo ""
 
-# Try Python 3 first
-if command -v python3 &> /dev/null; then
+# Try Homebrew Python 3 first (for macOS compatibility)
+if command -v /opt/homebrew/bin/python3 &> /dev/null; then
+    echo "Using Homebrew Python 3 HTTP server..."
+    echo ""
+    echo "🚀 Server starting at: http://localhost:$PORT"
+    echo "📍 Press Ctrl+C to stop the server"
+    echo ""
+    /opt/homebrew/bin/python3 -m http.server $PORT
+# Try Python 3
+elif command -v python3 &> /dev/null; then
     echo "Using Python 3 HTTP server..."
     echo ""
     echo "🚀 Server starting at: http://localhost:$PORT"
@@ -64,7 +72,7 @@ elif command -v php &> /dev/null; then
 elif command -v node &> /dev/null; then
     echo "Using Node.js http-server..."
     echo "Installing http-server (if not already installed)..."
-    npx http-server -p $PORT
+    npx --yes http-server -p $PORT
 else
     echo "❌ Error: No suitable HTTP server found."
     echo ""
