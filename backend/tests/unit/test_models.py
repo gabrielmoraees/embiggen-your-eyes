@@ -9,12 +9,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from main import (
+from app.models.enums import (
     Category,
     Subject,
     SourceId,
     ProjectionType,
-    AnnotationType,
+    AnnotationType
+)
+from app.models.schemas import (
     Source,
     Variant,
     Dataset,

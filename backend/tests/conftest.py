@@ -10,7 +10,10 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from main import app, annotations_db, links_db, collections_db, views_db
+from app.core.app import create_app
+from app.data.storage import annotations_db, links_db, collections_db, views_db
+
+app = create_app()
 
 
 @pytest.fixture(scope="function")
