@@ -549,7 +549,7 @@ async function createMarkerAnnotation(latlng) {
     );
     
     if (annotation) {
-        displayAnnotationOnMap(annotation);
+        displayAnnotationOnMap(annotation, true); // Auto-open popup for new marker
         showStatus('Marker added', 'success');
     }
 }
@@ -608,7 +608,7 @@ async function finishPath() {
     );
     
     if (annotation) {
-        displayAnnotationOnMap(annotation);
+        displayAnnotationOnMap(annotation, true); // Auto-open popup for new path
         showStatus('Path created', 'success');
     }
     
@@ -657,7 +657,7 @@ async function finishRectangle(latlng) {
     );
     
     if (annotation) {
-        displayAnnotationOnMap(annotation);
+        displayAnnotationOnMap(annotation, true); // Auto-open popup for new rectangle
         showStatus('Rectangle created', 'success');
     }
     
@@ -708,14 +708,14 @@ async function finishCircle(latlng) {
     );
     
     if (annotation) {
-        displayAnnotationOnMap(annotation);
+        displayAnnotationOnMap(annotation, true); // Auto-open popup for new circle
         showStatus('Circle created', 'success');
     }
     
     exitDrawingMode();
 }
 
-function displayAnnotationOnMap(annotation) {
+function displayAnnotationOnMap(annotation, autoOpenPopup = false) {
     let layer;
     
     if (annotation.type === 'point') {
@@ -761,19 +761,136 @@ function displayAnnotationOnMap(annotation) {
     }
     
     if (layer) {
-        layer.bindPopup(`
-            <div style="font-family: -apple-system, sans-serif;">
-                <strong>${annotation.text || 'Annotation'}</strong><br>
-                <small style="color: #666;">Type: ${annotation.type}</small>
-            </div>
-        `);
+        // Create popup with editable content
+        const popupContent = createEditablePopup(annotation);
+        layer.bindPopup(popupContent);
+        
+        // Add event listener for when popup opens
+        layer.on('popupopen', () => {
+            setupPopupEditing(annotation);
+        });
+        
         layer.addTo(map);
         
         // Store reference for cleanup
         if (!annotation._leafletLayer) {
             annotation._leafletLayer = layer;
         }
+        
+        // Auto-open popup for newly created annotations
+        if (autoOpenPopup) {
+            setTimeout(() => {
+                layer.openPopup();
+            }, 100);
+        }
     }
+}
+
+function createEditablePopup(annotation) {
+    return `
+        <div style="font-family: -apple-system, sans-serif; min-width: 150px;">
+            <div class="popup-title-editable" 
+                 data-annotation-id="${annotation.id}" 
+                 contenteditable="false" 
+                 spellcheck="false"
+                 style="font-weight: 600; 
+                        font-size: 15px; 
+                        padding: 4px 6px; 
+                        border-radius: 4px; 
+                        cursor: text; 
+                        transition: all 0.2s;
+                        outline: none;
+                        margin-bottom: 8px;"
+                 onmouseover="this.style.background='rgba(0,0,0,0.05)'"
+                 onmouseout="if(!this.isContentEditable) this.style.background='transparent'"
+            >${annotation.text || 'Annotation'}</div>
+            <small style="color: #666;">Type: ${annotation.type}</small>
+        </div>
+    `;
+}
+
+function setupPopupEditing(annotation) {
+    const titleEl = document.querySelector(`.popup-title-editable[data-annotation-id="${annotation.id}"]`);
+    if (!titleEl) return;
+    
+    // Click to edit
+    titleEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        enablePopupEdit(titleEl, annotation);
+    });
+    
+    // Save on blur
+    titleEl.addEventListener('blur', () => {
+        savePopupEdit(titleEl, annotation);
+    });
+    
+    // Keyboard shortcuts
+    titleEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            titleEl.blur();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelPopupEdit(titleEl, annotation);
+        }
+    });
+}
+
+function enablePopupEdit(element, annotation) {
+    // Store original value
+    element.dataset.originalValue = element.textContent;
+    
+    // Enable editing
+    element.contentEditable = true;
+    element.style.background = 'rgba(12, 140, 233, 0.15)';
+    element.style.border = '1px solid #0C8CE9';
+    element.style.boxShadow = '0 0 0 3px rgba(12, 140, 233, 0.2)';
+    
+    // Focus and select
+    element.focus();
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
+function savePopupEdit(element, annotation) {
+    if (!element.isContentEditable) return;
+    
+    const newName = element.textContent.trim();
+    const originalName = element.dataset.originalValue;
+    
+    // Reset styles
+    element.contentEditable = false;
+    element.style.background = 'transparent';
+    element.style.border = 'none';
+    element.style.boxShadow = 'none';
+    
+    // Update if changed
+    if (newName && newName !== originalName) {
+        updateAnnotationName(annotation.id, newName);
+    } else {
+        element.textContent = originalName;
+    }
+    
+    delete element.dataset.originalValue;
+}
+
+function cancelPopupEdit(element, annotation) {
+    if (!element.isContentEditable) return;
+    
+    // Restore original
+    element.textContent = element.dataset.originalValue;
+    
+    // Reset styles
+    element.contentEditable = false;
+    element.style.background = 'transparent';
+    element.style.border = 'none';
+    element.style.boxShadow = 'none';
+    
+    delete element.dataset.originalValue;
+    element.blur();
 }
 
 function enterDrawingMode(mode) {
@@ -1496,7 +1613,7 @@ function renderAnnotationsList(annotations) {
                 <span class="material-icons-round">${icons[ann.type] || 'place'}</span>
             </div>
             <div class="list-item-info">
-                <div class="list-item-title editable" data-annotation-id="${ann.id}">${ann.text || 'Annotation'}</div>
+                <div class="list-item-title editable" data-annotation-id="${ann.id}" contenteditable="false" spellcheck="false">${ann.text || 'Annotation'}</div>
                 <div class="list-item-desc">${ann.type}</div>
             </div>
             <button class="icon-btn delete-btn" onclick="deleteAnnotation('${ann.id}')" title="Delete">
@@ -1506,7 +1623,8 @@ function renderAnnotationsList(annotations) {
         
         // Click to focus on annotation and center map
         item.addEventListener('click', (e) => {
-            if (!e.target.closest('.icon-btn') && !e.target.classList.contains('editable') && ann._leafletLayer) {
+            const titleEl = item.querySelector('.editable');
+            if (!e.target.closest('.icon-btn') && !titleEl.isContentEditable && ann._leafletLayer) {
                 // Close the sheet to focus on map
                 closeBottomSheet();
                 
@@ -1520,13 +1638,28 @@ function renderAnnotationsList(annotations) {
             }
         });
         
-        // Make title editable on double-click
+        // Make title editable with inline editing
         const titleEl = item.querySelector('.editable');
-        titleEl.addEventListener('dblclick', (e) => {
+        
+        // Click on title to edit
+        titleEl.addEventListener('click', (e) => {
             e.stopPropagation();
-            const newName = prompt('Edit name:', ann.text);
-            if (newName && newName !== ann.text) {
-                updateAnnotationName(ann.id, newName);
+            enableInlineEdit(titleEl, ann);
+        });
+        
+        // Save on blur (clicking outside)
+        titleEl.addEventListener('blur', () => {
+            saveInlineEdit(titleEl, ann);
+        });
+        
+        // Save on Enter, Cancel on Escape
+        titleEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                titleEl.blur(); // Trigger save
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelInlineEdit(titleEl, ann);
             }
         });
         
@@ -1534,23 +1667,100 @@ function renderAnnotationsList(annotations) {
     });
 }
 
+// Inline editing functions for annotations
+function enableInlineEdit(element, annotation) {
+    // Store original value for potential cancel
+    element.dataset.originalValue = element.textContent;
+    
+    // Enable editing
+    element.contentEditable = true;
+    element.classList.add('editing');
+    
+    // Focus and select all text
+    element.focus();
+    
+    // Select all text for easy replacement
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
+function saveInlineEdit(element, annotation) {
+    if (!element.isContentEditable) return;
+    
+    const newName = element.textContent.trim();
+    const originalName = element.dataset.originalValue;
+    
+    // Disable editing
+    element.contentEditable = false;
+    element.classList.remove('editing');
+    
+    // If name changed, update
+    if (newName && newName !== originalName) {
+        updateAnnotationName(annotation.id, newName);
+    } else {
+        // Restore original if empty or unchanged
+        element.textContent = originalName;
+    }
+    
+    delete element.dataset.originalValue;
+}
+
+function cancelInlineEdit(element, annotation) {
+    if (!element.isContentEditable) return;
+    
+    // Restore original value
+    element.textContent = element.dataset.originalValue;
+    
+    // Disable editing
+    element.contentEditable = false;
+    element.classList.remove('editing');
+    
+    delete element.dataset.originalValue;
+    element.blur();
+}
+
 async function updateAnnotationName(annotationId, newName) {
     try {
         const annotation = AppState.annotations.find(a => a.id === annotationId);
         if (!annotation) return;
         
-        annotation.text = newName;
+        // Store old name for logging
+        const oldName = annotation.text;
         
+        // Update in-memory object
+        annotation.text = newName;
+        console.log(`📝 Updated annotation: "${oldName}" → "${newName}"`);
+        
+        // Update the popup on the map marker with editable version
+        if (annotation._leafletLayer) {
+            const popupContent = createEditablePopup(annotation);
+            annotation._leafletLayer.setPopupContent(popupContent);
+            
+            // If popup is open, re-setup editing
+            if (annotation._leafletLayer.isPopupOpen()) {
+                setTimeout(() => setupPopupEditing(annotation), 10);
+            }
+        }
+        
+        // Update the Tools panel list immediately (before API call for instant feedback)
+        renderAnnotationsList(AppState.annotations);
+        
+        // Save to backend
         await apiRequest(`/api/annotations/${annotationId}`, {
             method: 'PUT',
             body: JSON.stringify(annotation)
         });
         
-        renderAnnotationsList(AppState.annotations);
         showStatus('Name updated', 'success');
     } catch (error) {
         console.error('Failed to update annotation name:', error);
         showStatus('Failed to update name', 'error');
+        
+        // Re-render list in case of error to show correct state
+        renderAnnotationsList(AppState.annotations);
     }
 }
 
