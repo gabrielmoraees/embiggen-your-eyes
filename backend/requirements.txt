@@ -1,6 +1,7 @@
-fastapi==0.115.0
+fastapi==0.118.0
 uvicorn[standard]==0.32.1
 pydantic==2.10.6
+python-multipart==0.0.20
 python-dateutil==2.8.2
 urllib3<2.0  # Pin to v1.x for compatibility with macOS LibreSSL
 requests==2.31.0  # For downloading NASA images

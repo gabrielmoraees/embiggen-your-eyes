@@ -15,11 +15,28 @@ import pytest
 from fastapi.testclient import TestClient
 import requests
 from datetime import date
+from unittest.mock import patch
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from app.data.storage import DATASETS
+from app.models.enums import SourceId
 
 
 @pytest.mark.e2e
 class TestMapDiscoveryWorkflow:
     """E2E: Test complete map discovery workflow"""
+    
+    def setup_method(self):
+        """Clear custom datasets before each test"""
+        custom_ids = [
+            dataset_id for dataset_id, dataset in DATASETS.items()
+            if dataset.source_id == SourceId.CUSTOM
+        ]
+        for dataset_id in custom_ids:
+            del DATASETS[dataset_id]
     
     def test_discover_categories(self, client: TestClient):
         """E2E: User discovers available celestial bodies"""
@@ -109,6 +126,15 @@ class TestMapDiscoveryWorkflow:
 class TestViewWorkflow:
     """E2E: Test user-saved map view workflow"""
     
+    def setup_method(self):
+        """Clear custom datasets before each test"""
+        custom_ids = [
+            dataset_id for dataset_id, dataset in DATASETS.items()
+            if dataset.source_id == SourceId.CUSTOM
+        ]
+        for dataset_id in custom_ids:
+            del DATASETS[dataset_id]
+    
     def test_complete_map_view_lifecycle(self, client: TestClient):
         """E2E: Create, read, update, delete a map view"""
         # Step 1: Create a map view
@@ -182,6 +208,15 @@ class TestViewWorkflow:
 class TestAnnotationWorkflow:
     """E2E: Test annotation workflow with map views"""
     
+    def setup_method(self):
+        """Clear custom datasets before each test"""
+        custom_ids = [
+            dataset_id for dataset_id, dataset in DATASETS.items()
+            if dataset.source_id == SourceId.CUSTOM
+        ]
+        for dataset_id in custom_ids:
+            del DATASETS[dataset_id]
+    
     def test_add_annotations_to_map_view(self, client: TestClient):
         """E2E: User creates a view and adds annotations to it"""
         # Step 1: Create a map view
@@ -254,6 +289,15 @@ class TestAnnotationWorkflow:
 class TestCollectionWorkflow:
     """E2E: Test collection workflow"""
     
+    def setup_method(self):
+        """Clear custom datasets before each test"""
+        custom_ids = [
+            dataset_id for dataset_id, dataset in DATASETS.items()
+            if dataset.source_id == SourceId.CUSTOM
+        ]
+        for dataset_id in custom_ids:
+            del DATASETS[dataset_id]
+    
     def test_create_collection_of_views(self, client: TestClient):
         """E2E: User creates multiple views and groups them in a collection"""
         # Step 1: Create multiple map views
@@ -301,6 +345,15 @@ class TestCollectionWorkflow:
 @pytest.mark.e2e
 class TestTileAccessibility:
     """E2E: Test that all map variant tiles are accessible"""
+    
+    def setup_method(self):
+        """Clear custom datasets before each test"""
+        custom_ids = [
+            dataset_id for dataset_id, dataset in DATASETS.items()
+            if dataset.source_id == SourceId.CUSTOM
+        ]
+        for dataset_id in custom_ids:
+            del DATASETS[dataset_id]
     
     def test_all_map_variants_have_accessible_tiles(self, client: TestClient):
         """E2E: Verify all map variants return valid image tiles"""
@@ -371,6 +424,15 @@ class TestTileAccessibility:
 @pytest.mark.e2e
 class TestCompleteUserJourney:
     """E2E: Test a complete user journey from discovery to saved view"""
+    
+    def setup_method(self):
+        """Clear custom datasets before each test"""
+        custom_ids = [
+            dataset_id for dataset_id, dataset in DATASETS.items()
+            if dataset.source_id == SourceId.CUSTOM
+        ]
+        for dataset_id in custom_ids:
+            del DATASETS[dataset_id]
     
     def test_complete_user_journey(self, client: TestClient):
         """E2E: Simulate a complete user journey through the application"""
@@ -469,6 +531,15 @@ class TestCompleteUserJourney:
 class TestDataIntegrity:
     """E2E: Test data integrity across the data structure"""
     
+    def setup_method(self):
+        """Clear custom datasets before each test"""
+        custom_ids = [
+            dataset_id for dataset_id, dataset in DATASETS.items()
+            if dataset.source_id == SourceId.CUSTOM
+        ]
+        for dataset_id in custom_ids:
+            del DATASETS[dataset_id]
+    
     def test_all_datasets_have_valid_structure(self, client: TestClient):
         """E2E: Verify all datasets in catalog have valid structure"""
         response = client.get("/api/datasets")
@@ -537,3 +608,331 @@ class TestDataIntegrity:
             assert len(category["subjects"]) > 0
         
         print(f"\n✓ Catalog is complete and consistent")
+
+
+@pytest.mark.e2e
+class TestCustomImageUploadWorkflow:
+    """E2E: Test complete custom image upload workflow"""
+    
+    def setup_method(self):
+        """Clear custom datasets before each test"""
+        custom_ids = [
+            dataset_id for dataset_id, dataset in DATASETS.items()
+            if dataset.source_id == SourceId.CUSTOM
+        ]
+        for dataset_id in custom_ids:
+            del DATASETS[dataset_id]
+    
+    @patch('app.services.custom_image_service.tile_processor')
+    def test_complete_upload_workflow(self, mock_processor, client: TestClient):
+        """
+        E2E: Complete workflow from upload to display
+        
+        Steps:
+        1. User uploads custom image
+        2. System processes tiles
+        3. Dataset is created
+        4. User can view dataset in catalog
+        5. User can get tile URLs
+        6. User can create a view with the custom image
+        """
+        print("\n" + "=" * 60)
+        print("COMPLETE CUSTOM IMAGE UPLOAD WORKFLOW")
+        print("=" * 60)
+        
+        # Mock tile processor
+        mock_processor.is_tiled.return_value = True
+        mock_processor.get_tile_info.return_value = {
+            "tile_id": "test_workflow",
+            "max_zoom": 8,
+            "status": "completed"
+        }
+        mock_processor.get_tile_url_template.return_value = "http://localhost:8000/tiles/test_workflow/{z}/{x}/{y}.png"
+        
+        # Step 1: Upload custom image
+        print("\n1. User uploads custom image...")
+        upload_response = client.post("/api/custom-images", json={
+            "image_url": "https://example.com/my-galaxy.jpg",
+            "name": "My Galaxy Image",
+            "description": "A beautiful galaxy I photographed",
+            "category": "galaxies",
+            "subject": "custom"
+        })
+        
+        assert upload_response.status_code == 200
+        upload_data = upload_response.json()
+        
+        assert upload_data["success"] is True
+        dataset_id = upload_data["dataset_id"]
+        print(f"   ✓ Image uploaded, dataset ID: {dataset_id}")
+        print(f"   ✓ Status: {upload_data['status']}")
+        
+        # Step 2: Verify dataset in catalog
+        print("\n2. User finds dataset in catalog...")
+        catalog_response = client.get("/api/datasets")
+        catalog_data = catalog_response.json()
+        
+        custom_datasets = [d for d in catalog_data["datasets"] if d["id"] == dataset_id]
+        assert len(custom_datasets) == 1
+        print(f"   ✓ Dataset found in catalog")
+        
+        # Step 3: Get dataset details
+        print("\n3. User views dataset details...")
+        dataset_response = client.get(f"/api/datasets/{dataset_id}")
+        
+        assert dataset_response.status_code == 200
+        dataset = dataset_response.json()
+        
+        assert dataset["name"] == "My Galaxy Image"
+        assert dataset["category"] == "galaxies"
+        assert dataset["source_id"] == "custom"
+        print(f"   ✓ Dataset: {dataset['name']}")
+        print(f"   ✓ Category: {dataset['category']}")
+        
+        # Step 4: Get variant with tile URLs
+        print("\n4. User gets tile URLs...")
+        variant_response = client.get(f"/api/datasets/{dataset_id}/variants/default")
+        
+        assert variant_response.status_code == 200
+        variant_data = variant_response.json()
+        
+        variant = variant_data["variant"]
+        assert "{z}" in variant["tile_url"]
+        assert "{x}" in variant["tile_url"]
+        assert "{y}" in variant["tile_url"]
+        print(f"   ✓ Tile URL: {variant['tile_url'][:50]}...")
+        
+        # Step 5: Create a view with the custom image
+        print("\n5. User creates a saved view...")
+        view_response = client.post("/api/views", json={
+            "name": "My Galaxy View",
+            "description": "View of my custom galaxy image",
+            "dataset_id": dataset_id,
+            "variant_id": "default",
+            "center_lat": 0.0,
+            "center_lng": 0.0,
+            "zoom_level": 5
+        })
+        
+        assert view_response.status_code == 200
+        view = view_response.json()
+        print(f"   ✓ View created: {view['name']}")
+        
+        # Step 6: List custom images
+        print("\n6. User lists all custom images...")
+        list_response = client.get("/api/custom-images")
+        
+        assert list_response.status_code == 200
+        list_data = list_response.json()
+        
+        assert list_data["count"] >= 1
+        print(f"   ✓ Found {list_data['count']} custom image(s)")
+        
+        print("\n" + "=" * 60)
+        print("✓ COMPLETE WORKFLOW SUCCESSFUL")
+        print("=" * 60)
+    
+    @patch('app.services.custom_image_service.tile_processor')
+    def test_upload_and_delete_workflow(self, mock_processor, client: TestClient):
+        """
+        E2E: Upload and delete workflow
+        
+        Steps:
+        1. Upload custom image
+        2. Verify it exists
+        3. Delete the image
+        4. Verify it's gone
+        """
+        print("\n" + "=" * 60)
+        print("UPLOAD AND DELETE WORKFLOW")
+        print("=" * 60)
+        
+        # Mock tile processor
+        mock_processor.is_tiled.return_value = True
+        mock_processor.get_tile_info.return_value = {
+            "tile_id": "test_delete_workflow",
+            "max_zoom": 8,
+            "status": "completed"
+        }
+        mock_processor.get_tile_url_template.return_value = "http://localhost:8000/tiles/test_delete_workflow/{z}/{x}/{y}.png"
+        
+        # Step 1: Upload
+        print("\n1. Upload custom image...")
+        upload_response = client.post("/api/custom-images", json={
+            "image_url": "https://example.com/temp-image.jpg",
+            "name": "Temporary Image"
+        })
+        
+        dataset_id = upload_response.json()["dataset_id"]
+        print(f"   ✓ Uploaded: {dataset_id}")
+        
+        # Step 2: Verify exists
+        print("\n2. Verify image exists...")
+        get_response = client.get(f"/api/datasets/{dataset_id}")
+        assert get_response.status_code == 200
+        print(f"   ✓ Image exists in catalog")
+        
+        # Step 3: Delete
+        print("\n3. Delete image...")
+        delete_response = client.delete(f"/api/custom-images/{dataset_id}")
+        assert delete_response.status_code == 200
+        print(f"   ✓ Image deleted")
+        
+        # Step 4: Verify gone
+        print("\n4. Verify image is gone...")
+        get_after_delete = client.get(f"/api/datasets/{dataset_id}")
+        assert get_after_delete.status_code == 404
+        print(f"   ✓ Image no longer in catalog")
+        
+        print("\n" + "=" * 60)
+        print("✓ DELETE WORKFLOW SUCCESSFUL")
+        print("=" * 60)
+    
+    @patch('app.services.custom_image_service.tile_processor')
+    def test_multiple_images_workflow(self, mock_processor, client: TestClient):
+        """
+        E2E: Upload multiple custom images
+        
+        Steps:
+        1. Upload multiple images
+        2. List all custom images
+        3. Verify all are accessible
+        """
+        print("\n" + "=" * 60)
+        print("MULTIPLE IMAGES WORKFLOW")
+        print("=" * 60)
+        
+        # Mock tile processor
+        mock_processor.is_tiled.return_value = True
+        mock_processor.get_tile_url_template.return_value = "http://localhost:8000/tiles/test/{z}/{x}/{y}.png"
+        
+        images = [
+            {"url": "https://example.com/img1.jpg", "name": "Image 1"},
+            {"url": "https://example.com/img2.jpg", "name": "Image 2"},
+            {"url": "https://example.com/img3.jpg", "name": "Image 3"}
+        ]
+        
+        uploaded_ids = []
+        
+        # Step 1: Upload multiple images
+        print("\n1. Upload multiple images...")
+        for i, img in enumerate(images, 1):
+            mock_processor.get_tile_info.return_value = {
+                "tile_id": f"test_multi_{i}",
+                "max_zoom": 8,
+                "status": "completed"
+            }
+            
+            response = client.post("/api/custom-images", json={
+                "image_url": img["url"],
+                "name": img["name"]
+            })
+            
+            assert response.status_code == 200
+            dataset_id = response.json()["dataset_id"]
+            uploaded_ids.append(dataset_id)
+            print(f"   ✓ Uploaded: {img['name']}")
+        
+        # Step 2: List all custom images
+        print("\n2. List all custom images...")
+        list_response = client.get("/api/custom-images")
+        
+        assert list_response.status_code == 200
+        list_data = list_response.json()
+        
+        assert list_data["count"] == 3
+        print(f"   ✓ Found {list_data['count']} custom images")
+        
+        # Step 3: Verify all are accessible
+        print("\n3. Verify all images are accessible...")
+        for dataset_id in uploaded_ids:
+            response = client.get(f"/api/datasets/{dataset_id}")
+            assert response.status_code == 200
+            print(f"   ✓ {dataset_id} accessible")
+        
+        print("\n" + "=" * 60)
+        print("✓ MULTIPLE IMAGES WORKFLOW SUCCESSFUL")
+        print("=" * 60)
+    
+    @patch('app.services.custom_image_service.tile_processor')
+    def test_processing_status_workflow(self, mock_processor, client: TestClient):
+        """
+        E2E: Test tile processing status workflow
+        
+        Steps:
+        1. Upload image (starts processing)
+        2. Check processing status
+        3. Wait for completion
+        4. Verify tiles are ready
+        """
+        print("\n" + "=" * 60)
+        print("TILE PROCESSING STATUS WORKFLOW")
+        print("=" * 60)
+        
+        # Mock tile processor - initially processing
+        mock_processor.is_tiled.return_value = False
+        mock_processor._generate_tile_id.return_value = "test_status"
+        mock_processor.process_image.side_effect = Exception("Processing")
+        mock_processor.get_tile_url_template.side_effect = ValueError("Not ready")
+        
+        # Step 1: Upload image (triggers processing)
+        print("\n1. Upload image (triggers processing)...")
+        upload_response = client.post("/api/custom-images", json={
+            "image_url": "https://example.com/large-image.jpg",
+            "name": "Large Image"
+        })
+        
+        assert upload_response.status_code == 200
+        upload_data = upload_response.json()
+        
+        assert upload_data["status"] == "processing"
+        # Get dataset_id and extract tile_id from the mock
+        dataset_id = upload_data["dataset_id"]
+        tile_id = "test_status"  # This is what we set in the mock
+        print(f"   ✓ Upload initiated, status: processing")
+        print(f"   ✓ Dataset ID: {dataset_id}")
+        print(f"   ✓ Tile ID: {tile_id}")
+        
+        # Step 2: Check processing status
+        print("\n2. Check processing status...")
+        mock_processor.tile_index = {}
+        mock_processor.processing_status = {
+            tile_id: {
+                "status": "processing",
+                "progress": "generating_tiles",
+                "started_at": "2025-10-05T12:00:00"
+            }
+        }
+        
+        status_response = client.get(f"/api/tile-status/{tile_id}")
+        
+        assert status_response.status_code == 200
+        status_data = status_response.json()
+        
+        assert status_data["status"] == "processing"
+        print(f"   ✓ Status: {status_data['status']}")
+        print(f"   ✓ Progress: {status_data['progress']}")
+        
+        # Step 3: Simulate completion
+        print("\n3. Tiles complete processing...")
+        mock_processor.tile_index = {
+            tile_id: {
+                "tile_id": tile_id,
+                "status": "completed",
+                "max_zoom": 8
+            }
+        }
+        mock_processor.processing_status = {}
+        
+        status_response = client.get(f"/api/tile-status/{tile_id}")
+        
+        assert status_response.status_code == 200
+        status_data = status_response.json()
+        
+        assert status_data["status"] == "ready"
+        print(f"   ✓ Status: {status_data['status']}")
+        print(f"   ✓ Tiles ready for use!")
+        
+        print("\n" + "=" * 60)
+        print("✓ PROCESSING STATUS WORKFLOW SUCCESSFUL")
+        print("=" * 60)

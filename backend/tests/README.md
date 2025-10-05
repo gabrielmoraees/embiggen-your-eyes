@@ -83,6 +83,11 @@ pytest tests/integration/api/test_catalog.py
 # View tests
 pytest tests/integration/api/test_views.py
 
+# Custom image tests
+pytest tests/unit/services/test_custom_image_service.py
+pytest tests/integration/api/test_custom_images.py
+pytest tests/e2e/test_workflows.py::TestCustomImageUploadWorkflow
+
 # Model tests
 pytest tests/unit/models/
 ```
