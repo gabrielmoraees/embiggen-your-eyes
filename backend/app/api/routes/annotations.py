@@ -13,7 +13,10 @@ router = APIRouter()
 @router.post("/annotations", response_model=Annotation)
 def create_annotation(annotation: Annotation):
     """Create a new annotation"""
-    return AnnotationService.create_annotation(annotation)
+    try:
+        return AnnotationService.create_annotation(annotation)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/annotations")
@@ -34,10 +37,13 @@ def get_annotation(annotation_id: str):
 @router.put("/annotations/{annotation_id}", response_model=Annotation)
 def update_annotation(annotation_id: str, annotation: Annotation):
     """Update an annotation"""
-    updated_annotation = AnnotationService.update_annotation(annotation_id, annotation)
-    if not updated_annotation:
-        raise HTTPException(status_code=404, detail="Annotation not found")
-    return updated_annotation
+    try:
+        updated_annotation = AnnotationService.update_annotation(annotation_id, annotation)
+        if not updated_annotation:
+            raise HTTPException(status_code=404, detail="Annotation not found")
+        return updated_annotation
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/annotations/{annotation_id}")

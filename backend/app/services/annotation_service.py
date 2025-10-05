@@ -5,15 +5,45 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 import uuid
 from app.models.schemas import Annotation
-from app.data.storage import annotations_db
+from app.models.enums import AnnotationType
+from app.data.storage import annotations_db, DATASETS
 
 
 class AnnotationService:
     """Service for annotation operations"""
     
     @staticmethod
+    def _validate_link_target(annotation: Annotation) -> Optional[str]:
+        """
+        Validate link target for LINK type annotations
+        Returns error message if invalid, None if valid
+        """
+        if annotation.type != AnnotationType.LINK:
+            return None
+        
+        if not annotation.link_target:
+            return "link_target is required for LINK type annotations"
+        
+        # Validate dataset exists
+        if annotation.link_target.dataset_id not in DATASETS:
+            return f"Target dataset not found: {annotation.link_target.dataset_id}"
+        
+        # Validate variant exists in dataset
+        dataset = DATASETS[annotation.link_target.dataset_id]
+        variant_ids = [v.id for v in dataset.variants]
+        if annotation.link_target.variant_id not in variant_ids:
+            return f"Target variant not found: {annotation.link_target.variant_id}"
+        
+        return None
+    
+    @staticmethod
     def create_annotation(annotation: Annotation) -> Annotation:
         """Create a new annotation"""
+        # Validate link target if it's a LINK type
+        error = AnnotationService._validate_link_target(annotation)
+        if error:
+            raise ValueError(error)
+        
         annotation.id = str(uuid.uuid4())
         annotation.created_at = datetime.now()
         annotation.updated_at = datetime.now()
@@ -38,6 +68,11 @@ class AnnotationService:
         """Update an annotation"""
         if annotation_id not in annotations_db:
             return None
+        
+        # Validate link target if it's a LINK type
+        error = AnnotationService._validate_link_target(annotation)
+        if error:
+            raise ValueError(error)
         
         annotation.id = annotation_id
         annotation.updated_at = datetime.now()

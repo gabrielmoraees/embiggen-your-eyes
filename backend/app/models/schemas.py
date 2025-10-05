@@ -1,7 +1,7 @@
 """
 Pydantic schemas for data validation and serialization
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
 
@@ -102,7 +102,20 @@ class DatasetSearchQuery(BaseModel):
     limit: int = 50
 
 
+class LinkTarget(BaseModel):
+    """Target configuration for link annotations"""
+    dataset_id: str
+    variant_id: str
+    center_lat: Optional[float] = None
+    center_lng: Optional[float] = None
+    zoom_level: Optional[int] = None
+    selected_date: Optional[date] = None
+    preserve_zoom: bool = True
+    preserve_layers: bool = False
+
+
 class Annotation(BaseModel):
+    """Map annotation (point, polygon, text, or link)"""
     id: Optional[str] = None
     map_view_id: Optional[str] = None  # Link to View
     type: AnnotationType
@@ -110,8 +123,19 @@ class Annotation(BaseModel):
     properties: Dict[str, Any] = {}
     text: Optional[str] = None
     color: str = "#FF0000"
+    link_target: Optional[LinkTarget] = None  # Only for LINK type
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    
+    @model_validator(mode='after')
+    def validate_link_target(self):
+        """Ensure link_target is provided for LINK type and not for others"""
+        if self.type == AnnotationType.LINK:
+            if self.link_target is None:
+                raise ValueError("link_target is required for LINK type annotations")
+        elif self.link_target is not None:
+            raise ValueError(f"link_target should only be provided for LINK type annotations, not {self.type}")
+        return self
 
 
 class ImageLink(BaseModel):

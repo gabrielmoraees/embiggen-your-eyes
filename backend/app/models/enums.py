@@ -65,3 +65,4 @@ class AnnotationType(str, Enum):
     RECTANGLE = "rectangle"
     CIRCLE = "circle"
     TEXT = "text"
+    LINK = "link"

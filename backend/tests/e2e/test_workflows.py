@@ -1026,3 +1026,214 @@ class TestCustomImageUploadWorkflow:
         print("\n" + "=" * 60)
         print("✓ TILE SERVICE DATASET WORKFLOW SUCCESSFUL")
         print("=" * 60)
+
+
+class TestLinkAnnotationWorkflow:
+    """E2E: Test complete link annotation workflow"""
+    
+    def test_create_link_between_views(self, client: TestClient):
+        """
+        E2E: Create link annotations to connect related views
+        
+        Steps:
+        1. User creates first view (Earth hurricane)
+        2. User creates second view (Mars dust storm)
+        3. User adds link annotation on first view pointing to second
+        4. User navigates using the link
+        5. User adds bidirectional link back
+        6. User creates collection with both views
+        """
+        print("\n" + "=" * 60)
+        print("E2E: LINK ANNOTATION WORKFLOW")
+        print("=" * 60)
+        
+        # Step 1: Create first view (Earth hurricane)
+        print("\n1. User creates view of Earth hurricane...")
+        view1_data = {
+            "name": "Hurricane Milton - Oct 5",
+            "description": "Category 4 hurricane",
+            "dataset_id": "viirs_snpp",
+            "variant_id": "true_color",
+            "selected_date": "2025-10-05",
+            "center_lat": 25.0,
+            "center_lng": -80.0,
+            "zoom_level": 6
+        }
+        
+        view1_response = client.post("/api/views", json=view1_data)
+        assert view1_response.status_code == 200
+        view1 = view1_response.json()
+        view1_id = view1["id"]
+        print(f"   ✓ View 1 created: {view1['name']}")
+        
+        # Step 2: Create second view (Mars dust storm)
+        print("\n2. User creates view of Mars dust storm...")
+        view2_data = {
+            "name": "Mars Dust Storm - Olympus Mons",
+            "description": "Similar atmospheric phenomenon on Mars",
+            "dataset_id": "mars_viking",
+            "variant_id": "colorized",
+            "center_lat": -14.5,
+            "center_lng": 175.4,
+            "zoom_level": 6
+        }
+        
+        view2_response = client.post("/api/views", json=view2_data)
+        assert view2_response.status_code == 200
+        view2 = view2_response.json()
+        view2_id = view2["id"]
+        print(f"   ✓ View 2 created: {view2['name']}")
+        
+        # Step 3: Add link annotation on first view pointing to second
+        print("\n3. User adds link annotation on Earth view...")
+        link_annotation_data = {
+            "map_view_id": view1_id,
+            "type": "link",
+            "coordinates": [{"lat": 25.5, "lng": -80.3}],
+            "text": "Compare with Mars dust storm",
+            "color": "#0066CC",
+            "link_target": {
+                "dataset_id": "mars_viking",
+                "variant_id": "colorized",
+                "center_lat": -14.5,
+                "center_lng": 175.4,
+                "zoom_level": 6,
+                "preserve_zoom": True
+            }
+        }
+        
+        link_response = client.post("/api/annotations", json=link_annotation_data)
+        assert link_response.status_code == 200
+        link_annotation = link_response.json()
+        print(f"   ✓ Link annotation created: {link_annotation['text']}")
+        print(f"   ✓ Links to: {link_annotation['link_target']['dataset_id']}")
+        
+        # Step 4: User retrieves annotations for view 1
+        print("\n4. User retrieves annotations for Earth view...")
+        annotations_response = client.get(f"/api/annotations?map_view_id={view1_id}")
+        assert annotations_response.status_code == 200
+        annotations_data = annotations_response.json()
+        
+        assert len(annotations_data["annotations"]) == 1
+        assert annotations_data["annotations"][0]["type"] == "link"
+        print(f"   ✓ Found {len(annotations_data['annotations'])} link annotation(s)")
+        
+        # Step 5: Add bidirectional link back from view 2 to view 1
+        print("\n5. User adds link back from Mars view...")
+        back_link_data = {
+            "map_view_id": view2_id,
+            "type": "link",
+            "coordinates": [{"lat": -14.0, "lng": 175.0}],
+            "text": "Compare with Earth hurricane",
+            "color": "#0066CC",
+            "link_target": {
+                "dataset_id": "viirs_snpp",
+                "variant_id": "true_color",
+                "center_lat": 25.0,
+                "center_lng": -80.0,
+                "zoom_level": 6,
+                "preserve_zoom": True
+            }
+        }
+        
+        back_link_response = client.post("/api/annotations", json=back_link_data)
+        assert back_link_response.status_code == 200
+        print(f"   ✓ Bidirectional link created")
+        
+        # Step 6: Create collection with both views
+        print("\n6. User creates collection with both views...")
+        collection_data = {
+            "name": "Weather Phenomena Comparison",
+            "description": "Comparing atmospheric storms on Earth and Mars",
+            "view_ids": [view1_id, view2_id]
+        }
+        
+        collection_response = client.post("/api/collections", json=collection_data)
+        assert collection_response.status_code == 200
+        collection = collection_response.json()
+        print(f"   ✓ Collection created: {collection['name']}")
+        print(f"   ✓ Contains {len(collection['view_ids'])} views with interconnected links")
+        
+        print("\n" + "=" * 60)
+        print("✓ LINK ANNOTATION WORKFLOW SUCCESSFUL")
+        print("=" * 60)
+    
+    def test_link_annotation_validation(self, client: TestClient):
+        """
+        E2E: Test link annotation validation
+        
+        Steps:
+        1. User tries to create link with invalid dataset (fails)
+        2. User tries to create link with invalid variant (fails)
+        3. User creates valid link (succeeds)
+        4. User verifies link target is accessible
+        """
+        print("\n" + "=" * 60)
+        print("E2E: LINK ANNOTATION VALIDATION")
+        print("=" * 60)
+        
+        # Step 1: Try to create link with invalid dataset
+        print("\n1. User tries to create link with invalid dataset...")
+        invalid_dataset_link = {
+            "type": "link",
+            "coordinates": [{"lat": 25.0, "lng": -80.0}],
+            "text": "Invalid link",
+            "link_target": {
+                "dataset_id": "nonexistent_dataset",
+                "variant_id": "some_variant"
+            }
+        }
+        
+        response = client.post("/api/annotations", json=invalid_dataset_link)
+        assert response.status_code == 400
+        print(f"   ✓ Correctly rejected: {response.json()['detail']}")
+        
+        # Step 2: Try to create link with invalid variant
+        print("\n2. User tries to create link with invalid variant...")
+        invalid_variant_link = {
+            "type": "link",
+            "coordinates": [{"lat": 25.0, "lng": -80.0}],
+            "text": "Invalid variant",
+            "link_target": {
+                "dataset_id": "viirs_snpp",
+                "variant_id": "nonexistent_variant"
+            }
+        }
+        
+        response = client.post("/api/annotations", json=invalid_variant_link)
+        assert response.status_code == 400
+        print(f"   ✓ Correctly rejected: {response.json()['detail']}")
+        
+        # Step 3: Create valid link
+        print("\n3. User creates valid link...")
+        valid_link = {
+            "type": "link",
+            "coordinates": [{"lat": 25.0, "lng": -80.0}],
+            "text": "Valid link to Mars",
+            "link_target": {
+                "dataset_id": "mars_viking",
+                "variant_id": "colorized"
+            }
+        }
+        
+        response = client.post("/api/annotations", json=valid_link)
+        assert response.status_code == 200
+        link = response.json()
+        print(f"   ✓ Link created successfully")
+        
+        # Step 4: Verify link target is accessible
+        print("\n4. User verifies link target is accessible...")
+        target_dataset_id = link["link_target"]["dataset_id"]
+        target_variant_id = link["link_target"]["variant_id"]
+        
+        dataset_response = client.get(f"/api/datasets/{target_dataset_id}")
+        assert dataset_response.status_code == 200
+        print(f"   ✓ Target dataset accessible: {target_dataset_id}")
+        
+        variant_response = client.get(f"/api/datasets/{target_dataset_id}/variants/{target_variant_id}")
+        assert variant_response.status_code == 200
+        print(f"   ✓ Target variant accessible: {target_variant_id}")
+        
+        print("\n" + "=" * 60)
+        print("✓ LINK ANNOTATION VALIDATION SUCCESSFUL")
+        print("=" * 60)
