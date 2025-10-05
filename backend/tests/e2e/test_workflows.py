@@ -764,8 +764,8 @@ class TestCustomImageUploadWorkflow:
         upload_response = client.post("/api/datasets", json={
             "url": "https://example.com/temp-image.jpg",
             "name": "Temporary Image",
-            "category": "custom",
-            "subject": "custom"
+            "category": "galaxies",
+            "subject": "andromeda"
         })
         
         dataset_id = upload_response.json()["dataset_id"]
@@ -832,8 +832,8 @@ class TestCustomImageUploadWorkflow:
             response = client.post("/api/datasets", json={
                 "url": img["url"],
                 "name": img["name"],
-                "category": "custom",
-                "subject": "custom"
+                "category": "galaxies",
+                "subject": "andromeda"
             })
             
             assert response.status_code == 200

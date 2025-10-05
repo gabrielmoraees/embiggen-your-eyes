@@ -29,14 +29,6 @@ def initialize_catalog():
         terms_of_use="Public domain"
     )
     
-    SOURCES[SourceId.CUSTOM] = Source(
-        id=SourceId.CUSTOM,
-        name="User Provided",
-        description="User-uploaded custom imagery and datasets",
-        attribution="User Provided",
-        url=None,
-        terms_of_use="User-defined"
-    )
     
     SOURCES[SourceId.OPENPLANETARYMAP] = Source(
         id=SourceId.OPENPLANETARYMAP,
@@ -58,10 +50,10 @@ def initialize_catalog():
     
     SOURCES[SourceId.CUSTOM] = Source(
         id=SourceId.CUSTOM,
-        name="Custom Images",
-        description="User-uploaded custom gigapixel images",
-        attribution="User-provided",
-        terms_of_use="As specified by uploader"
+        name="Zoomers Community",
+        description="User-uploaded imagery shared publicly on the Zoomers platform",
+        attribution="Zoomers Community Contributors",
+        terms_of_use="Publicly available - uploaded via Zoomers"
     )
     
     # ========== EARTH DATASETS ==========

@@ -234,8 +234,8 @@ class TestDatasetCreation:
         
         request_data = {
             "name": "Duplicate Test",
-            "category": "custom",
-            "subject": "custom",
+            "category": "galaxies",
+            "subject": "andromeda",
             "url": "https://example.com/duplicate.jpg"
         }
         
@@ -343,8 +343,8 @@ class TestDatasetUpdate:
         create_response = client.post("/api/datasets", json={
             "name": "Original Name",
             "description": "Original description",
-            "category": "custom",
-            "subject": "custom",
+            "category": "galaxies",
+            "subject": "andromeda",
             "url": "https://example.com/image.jpg"
         })
         
@@ -381,8 +381,8 @@ class TestDatasetUpdate:
         create_response = client.post("/api/datasets", json={
             "name": "Original",
             "description": "Original desc",
-            "category": "custom",
-            "subject": "custom",
+            "category": "galaxies",
+            "subject": "andromeda",
             "url": "https://example.com/multi.jpg"
         })
         
@@ -438,8 +438,8 @@ class TestDatasetUpdate:
         # Create dataset
         create_response = client.post("/api/datasets", json={
             "name": "Test",
-            "category": "custom",
-            "subject": "custom",
+            "category": "galaxies",
+            "subject": "andromeda",
             "url": "https://example.com/empty.jpg"
         })
         
@@ -468,8 +468,8 @@ class TestDatasetUpdate:
         # Create dataset
         create_response = client.post("/api/datasets", json={
             "name": "Before Update",
-            "category": "custom",
-            "subject": "custom",
+            "category": "galaxies",
+            "subject": "andromeda",
             "url": "https://example.com/catalog.jpg"
         })
         
@@ -503,8 +503,8 @@ class TestDatasetUpdate:
         # Create dataset
         create_response = client.post("/api/datasets", json={
             "name": "Test",
-            "category": "custom",
-            "subject": "custom",
+            "category": "galaxies",
+            "subject": "andromeda",
             "url": "https://example.com/methods.jpg"
         })
         

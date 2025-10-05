@@ -14,7 +14,6 @@ class Category(str, Enum):
     STAR_CLUSTERS = "star_clusters"
     PHENOMENA = "phenomena"
     REGIONS = "regions"
-    CUSTOM = "custom"
 
 
 class Subject(str, Enum):
@@ -38,9 +37,6 @@ class Subject(str, Enum):
     # Galaxies
     MILKY_WAY = "milky_way"
     ANDROMEDA = "andromeda"
-    
-    # Custom
-    CUSTOM = "custom"
 
 
 class SourceId(str, Enum):

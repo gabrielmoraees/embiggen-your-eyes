@@ -18,14 +18,12 @@ class TestEnums:
         assert Category.PLANETS.value == "planets"
         assert Category.MOONS.value == "moons"
         assert Category.GALAXIES.value == "galaxies"
-        assert Category.CUSTOM.value == "custom"
     
     def test_subject_enum(self):
         """Test Subject enum values"""
         assert Subject.EARTH.value == "earth"
         assert Subject.MARS.value == "mars"
         assert Subject.MOON.value == "moon"
-        assert Subject.CUSTOM.value == "custom"
     
     def test_source_id_enum(self):
         """Test SourceId enum values"""
