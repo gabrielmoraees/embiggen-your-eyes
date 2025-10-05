@@ -262,8 +262,20 @@ async function loadAnnotations(viewId = null) {
         const endpoint = viewId 
             ? `/api/annotations?map_view_id=${viewId}`
             : '/api/annotations';
-        const annotations = await apiRequest(endpoint);
+        const response = await apiRequest(endpoint);
+        
+        // Backend returns {annotations: [...]} not just [...]
+        const annotations = response.annotations || response;
+        
+        // Ensure annotations is always an array
+        if (!Array.isArray(annotations)) {
+            console.warn('API returned non-array for annotations:', annotations);
+            AppState.annotations = [];
+            return [];
+        }
+        
         AppState.annotations = annotations;
+        console.log(`✅ Loaded ${annotations.length} annotations from backend`);
         
         // Display all annotations on map
         annotations.forEach(ann => displayAnnotationOnMap(ann));
@@ -272,6 +284,8 @@ async function loadAnnotations(viewId = null) {
         return annotations;
     } catch (error) {
         console.error('Failed to load annotations:', error);
+        // Ensure annotations remains an array even on error
+        AppState.annotations = [];
         return [];
     }
 }
@@ -290,7 +304,14 @@ async function createAnnotation(type, coordinates, text, color = '#007AFF', prop
             })
         });
         
+        // Ensure annotations is an array before pushing
+        if (!Array.isArray(AppState.annotations)) {
+            console.warn('AppState.annotations is not an array, reinitializing...');
+            AppState.annotations = [];
+        }
+        
         AppState.annotations.push(annotation);
+        console.log(`✅ Annotation created and added to state. Total: ${AppState.annotations.length}`);
         renderAnnotationsList(AppState.annotations);
         return annotation;
     } catch (error) {
@@ -541,6 +562,7 @@ async function createMarkerAnnotation(latlng) {
     // Use default name, user can edit later
     const name = `Marker ${AppState.annotations.length + 1}`;
     
+    console.log('📍 Creating marker at:', latlng);
     const annotation = await createAnnotation(
         'point',
         [{lat: latlng.lat, lng: latlng.lng}],
@@ -548,9 +570,15 @@ async function createMarkerAnnotation(latlng) {
         '#007AFF'
     );
     
+    console.log('📍 Annotation created:', annotation);
     if (annotation) {
+        console.log('📍 Displaying annotation on map...');
         displayAnnotationOnMap(annotation, true); // Auto-open popup for new marker
+        console.log('📍 Annotation displayed!');
         showStatus('Marker added', 'success');
+    } else {
+        console.error('❌ Failed to create annotation');
+        showStatus('Failed to add marker', 'error');
     }
 }
 
@@ -716,9 +744,11 @@ async function finishCircle(latlng) {
 }
 
 function displayAnnotationOnMap(annotation, autoOpenPopup = false) {
+    console.log('🗺️ displayAnnotationOnMap called for:', annotation.type, annotation.text);
     let layer;
     
     if (annotation.type === 'point') {
+        console.log('🗺️ Creating circleMarker at:', annotation.coordinates[0]);
         layer = L.circleMarker(
             [annotation.coordinates[0].lat, annotation.coordinates[0].lng],
             {
@@ -729,6 +759,7 @@ function displayAnnotationOnMap(annotation, autoOpenPopup = false) {
                 weight: 2
             }
         );
+        console.log('🗺️ CircleMarker created:', layer);
     } else if (annotation.type === 'polygon') {
         const coords = annotation.coordinates.map(c => [c.lat, c.lng]);
         layer = L.polyline(coords, {
@@ -761,6 +792,7 @@ function displayAnnotationOnMap(annotation, autoOpenPopup = false) {
     }
     
     if (layer) {
+        console.log('🗺️ Layer created, adding to map...');
         // Create popup with editable content
         const popupContent = createEditablePopup(annotation);
         layer.bindPopup(popupContent);
@@ -770,7 +802,9 @@ function displayAnnotationOnMap(annotation, autoOpenPopup = false) {
             setupPopupEditing(annotation);
         });
         
+        console.log('🗺️ Adding layer to map. Map object:', map);
         layer.addTo(map);
+        console.log('🗺️ Layer added to map successfully!');
         
         // Store reference for cleanup
         if (!annotation._leafletLayer) {
@@ -779,10 +813,14 @@ function displayAnnotationOnMap(annotation, autoOpenPopup = false) {
         
         // Auto-open popup for newly created annotations
         if (autoOpenPopup) {
+            console.log('🗺️ Auto-opening popup in 100ms...');
             setTimeout(() => {
                 layer.openPopup();
+                console.log('🗺️ Popup opened!');
             }, 100);
         }
+    } else {
+        console.error('❌ Layer is null/undefined! annotation.type:', annotation.type);
     }
 }
 
@@ -1725,7 +1763,10 @@ function cancelInlineEdit(element, annotation) {
 async function updateAnnotationName(annotationId, newName) {
     try {
         const annotation = AppState.annotations.find(a => a.id === annotationId);
-        if (!annotation) return;
+        if (!annotation) {
+            console.error('Annotation not found:', annotationId);
+            return;
+        }
         
         // Store old name for logging
         const oldName = annotation.text;
@@ -1748,12 +1789,26 @@ async function updateAnnotationName(annotationId, newName) {
         // Update the Tools panel list immediately (before API call for instant feedback)
         renderAnnotationsList(AppState.annotations);
         
+        // Prepare update payload with only the fields the backend expects
+        const updatePayload = {
+            map_view_id: annotation.map_view_id || null,
+            type: annotation.type,
+            coordinates: annotation.coordinates,
+            text: newName,
+            color: annotation.color,
+            properties: annotation.properties || {},
+            link_target: annotation.link_target || null
+        };
+        
+        console.log('📤 Sending update to backend:', updatePayload);
+        
         // Save to backend
         await apiRequest(`/api/annotations/${annotationId}`, {
             method: 'PUT',
-            body: JSON.stringify(annotation)
+            body: JSON.stringify(updatePayload)
         });
         
+        console.log('✅ Backend update successful');
         showStatus('Name updated', 'success');
     } catch (error) {
         console.error('Failed to update annotation name:', error);
@@ -2520,6 +2575,12 @@ async function initializeApp() {
         // Update breadcrumb
         updateBreadcrumb();
     }
+    
+    // Load saved annotations AFTER map is fully initialized
+    console.log('📍 Loading annotations...');
+    await loadAnnotations();
+    console.log(`Annotations loaded: ${AppState.annotations.length} total`);
+
     
     console.log('✅ App initialization complete!');
     console.log('🎨 Enjoy the iOS 26-inspired interface!');
