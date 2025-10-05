@@ -34,10 +34,6 @@
                     <span class="material-icons-round">public</span>
                     <span class="action-label">Explore</span>
                 </button>
-                <button class="action-btn" id="btn-layers" title="Datasets">
-                    <span class="material-icons-round">layers</span>
-                    <span class="action-label">Datasets</span>
-                </button>
                 <button class="action-btn" id="btn-overlay" title="Overlay Layers">
                     <span class="material-icons-round">filter_none</span>
                     <span class="action-label">Overlay</span>
@@ -45,10 +41,6 @@
                 <button class="action-btn" id="btn-compare" title="Compare">
                     <span class="material-icons-round">compare</span>
                     <span class="action-label">Compare</span>
-                </button>
-                <button class="action-btn" id="btn-collections" title="Collections">
-                    <span class="material-icons-round">collections</span>
-                    <span class="action-label">Sets</span>
                 </button>
                 <button class="action-btn" id="btn-tools" title="Tools">
                     <span class="material-icons-round">draw</span>
@@ -184,12 +176,9 @@
     </div>
     
     <!-- Floating Top Bar -->
-    <div class="top-bar glass">
+    <div class="top-bar">
         <div class="top-bar-left">
-            <h1 class="app-title">
-                <span class="material-icons-round">explore</span>
-                Embiggen Your Eyes
-            </h1>
+            <img src="assets/logo.svg" alt="Embiggen Your Eyes" class="app-logo" />
         </div>
         <div class="top-bar-right">
             <div class="status-pill" id="status-pill">
@@ -202,9 +191,52 @@
             <button class="icon-btn glass" id="btn-search" title="Search">
                 <span class="material-icons-round">search</span>
             </button>
+            <button class="dataset-btn glass" id="btn-dataset-dropdown" title="Dataset">
+                <span class="material-icons-round">layers</span>
+                <span class="dataset-btn-label" id="dataset-btn-label">Dataset</span>
+                <span class="material-icons-round">expand_more</span>
+            </button>
         </div>
     </div>
     
+    <!-- Dataset Dropdown Menu -->
+    <div class="dataset-dropdown glass hidden" id="dataset-dropdown">
+        <div class="dropdown-header">
+            <h3 class="dropdown-title">Dataset</h3>
+            <div class="panel-breadcrumb" id="dataset-breadcrumb-dropdown"></div>
+        </div>
+        <div id="layers-list-dropdown" class="layers-list"></div>
+        
+        <!-- Variant Selector -->
+        <div class="variant-section hidden" id="variant-section-dropdown">
+            <label class="input-label">Visualization</label>
+            <div id="variant-selector-dropdown" class="variant-grid"></div>
+        </div>
+        
+        <!-- Date Picker -->
+        <div class="date-picker-section hidden" id="date-section-dropdown">
+            <label class="input-label">
+                <span class="material-icons-round" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">event</span>
+                Date 
+                <span class="date-range-info" id="date-range-info-dropdown"></span>
+            </label>
+            
+            <!-- Quick date buttons -->
+            <div class="date-quick-actions" id="date-quick-actions-dropdown">
+                <button class="date-quick-btn" data-offset="0" title="Today">Today</button>
+                <button class="date-quick-btn" data-offset="-1" title="Yesterday">-1d</button>
+                <button class="date-quick-btn" data-offset="-7" title="1 week ago">-1w</button>
+                <button class="date-quick-btn" data-offset="-30" title="1 month ago">-1m</button>
+            </div>
+            
+            <!-- Date input with wrapper -->
+            <div class="date-input-wrapper">
+                <span class="material-icons-round date-icon">calendar_today</span>
+                <input type="date" id="date-picker-dropdown" class="glass-input date-input" />
+            </div>
+        </div>
+        </div>
+        
     <!-- Floating Map Controls -->
     <div class="map-controls">
         <button class="map-btn glass" id="btn-zoom-in" title="Zoom In">
@@ -229,7 +261,7 @@
         </div>
         <div class="hud-item">
             <span class="material-icons-round">zoom_in</span>
-            <span id="zoom-level">Zoom: 2</span>
+        <span id="zoom-level">Zoom: 2</span>
         </div>
     </div>
     

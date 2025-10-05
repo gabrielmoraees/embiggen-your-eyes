@@ -958,8 +958,26 @@ function renderCategoriesWithSubjects() {
             
             console.log(`Subject clicked: ${category} > ${subject}`);
             
+            // Check if this subject is already selected
+            if (AppState.currentCategory === category && AppState.currentSubject === subject) {
+                console.log('Subject already selected, skipping reload');
+                
+                // Just collapse the bottom sheet
+                const controlSheet = document.getElementById('control-sheet');
+                if (controlSheet) {
+                    controlSheet.classList.add('collapsed');
+                }
+                return;
+            }
+            
             AppState.currentCategory = category;
             AppState.currentSubject = subject;
+            
+            // Collapse bottom sheet to focus on map
+            const controlSheet = document.getElementById('control-sheet');
+            if (controlSheet) {
+                controlSheet.classList.add('collapsed');
+            }
             
             // Load datasets for this subject
             const datasets = await loadDatasets(category, subject);
@@ -990,17 +1008,14 @@ function renderCategoriesWithSubjects() {
             // Update breadcrumb
             updateBreadcrumb();
             
-            // Switch to datasets panel
-            switchPanel('panel-layers');
-            document.getElementById('btn-layers').classList.add('active');
-            document.getElementById('btn-bodies').classList.remove('active');
+            // Dataset is now in dropdown, no need to switch panels
         });
     });
 }
 
 function updateBreadcrumb() {
     const breadcrumb = document.getElementById('dataset-breadcrumb');
-    if (!breadcrumb) return;
+    const breadcrumbDropdown = document.getElementById('dataset-breadcrumb-dropdown');
     
     const parts = [];
     if (AppState.currentCategory) {
@@ -1013,24 +1028,47 @@ function updateBreadcrumb() {
         parts.push(AppState.currentDataset.name);
     }
     
-    breadcrumb.textContent = parts.join(' › ');
+    const breadcrumbText = parts.join(' › ');
+    if (breadcrumb) breadcrumb.textContent = breadcrumbText;
+    if (breadcrumbDropdown) breadcrumbDropdown.textContent = breadcrumbText;
+    
+    // Update dataset button label
+    updateDatasetButtonLabel();
+}
+
+function updateDatasetButtonLabel() {
+    const btnLabel = document.getElementById('dataset-btn-label');
+    if (!btnLabel) return;
+    
+    // Always show "Dataset" label
+    btnLabel.textContent = 'Dataset';
 }
 
 function renderDatasetsList(datasets) {
     const layersList = document.getElementById('layers-list');
-    if (!layersList) {
-        console.error('layers-list element not found');
-        return;
-    }
-    
-    layersList.innerHTML = '';
+    const layersListDropdown = document.getElementById('layers-list-dropdown');
     
     console.log(`Rendering ${datasets.length} datasets`);
     
     if (datasets.length === 0) {
-        layersList.innerHTML = '<div class="panel-desc">No datasets available for this selection</div>';
+        const emptyMsg = '<div class="panel-desc">No datasets available for this selection</div>';
+        if (layersList) layersList.innerHTML = emptyMsg;
+        if (layersListDropdown) layersListDropdown.innerHTML = emptyMsg;
         return;
     }
+    
+    if (layersList) {
+        layersList.innerHTML = '';
+        renderDatasetsInContainer(datasets, layersList);
+    }
+    
+    if (layersListDropdown) {
+        layersListDropdown.innerHTML = '';
+        renderDatasetsInContainer(datasets, layersListDropdown);
+    }
+}
+
+function renderDatasetsInContainer(datasets, container) {
     
     datasets.forEach(dataset => {
         const card = document.createElement('div');
@@ -1089,30 +1127,40 @@ function renderDatasetsList(datasets) {
             renderDatasetsList(datasets);
         });
         
-        layersList.appendChild(card);
+        container.appendChild(card);
     });
 }
 
 function renderVariantSelector(variants) {
     const variantSection = document.getElementById('variant-section');
     const variantSelector = document.getElementById('variant-selector');
-    
-    if (!variantSection || !variantSelector) {
-        console.error('Variant selector elements not found');
-        return;
-    }
+    const variantSectionDropdown = document.getElementById('variant-section-dropdown');
+    const variantSelectorDropdown = document.getElementById('variant-selector-dropdown');
     
     if (!variants || variants.length === 0) {
-        variantSection.classList.add('hidden');
+        if (variantSection) variantSection.classList.add('hidden');
+        if (variantSectionDropdown) variantSectionDropdown.classList.add('hidden');
         return;
     }
-    
-    // Show variant section (even for single variant to show what's selected)
-    variantSection.classList.remove('hidden');
-    variantSelector.innerHTML = '';
     
     console.log(`Rendering ${variants.length} variant(s), current: ${AppState.currentVariant?.id}`);
     
+    // Render in panel
+    if (variantSection && variantSelector) {
+        variantSection.classList.remove('hidden');
+        variantSelector.innerHTML = '';
+        renderVariantsInContainer(variants, variantSelector);
+    }
+    
+    // Render in dropdown
+    if (variantSectionDropdown && variantSelectorDropdown) {
+        variantSectionDropdown.classList.remove('hidden');
+        variantSelectorDropdown.innerHTML = '';
+        renderVariantsInContainer(variants, variantSelectorDropdown);
+    }
+}
+
+function renderVariantsInContainer(variants, container) {
     variants.forEach(variant => {
         const card = document.createElement('div');
         card.className = 'variant-card';
@@ -1128,10 +1176,10 @@ function renderVariantSelector(variants) {
         card.addEventListener('click', async () => {
             AppState.currentVariant = variant;
             await updateBaseLayer();
-            renderVariantSelector(variants);
+            renderVariantSelector([...variants]); // Re-render both
         });
         
-        variantSelector.appendChild(card);
+        container.appendChild(card);
     });
 }
 
@@ -1139,31 +1187,48 @@ function updateDatePickerVisibility(dataset) {
     const dateSection = document.getElementById('date-section');
     const datePicker = document.getElementById('date-picker');
     const dateRangeInfo = document.getElementById('date-range-info');
+    const dateSectionDropdown = document.getElementById('date-section-dropdown');
+    const datePickerDropdown = document.getElementById('date-picker-dropdown');
+    const dateRangeInfoDropdown = document.getElementById('date-range-info-dropdown');
     
     if (!dataset.supports_time_series) {
-        dateSection.classList.add('hidden');
+        if (dateSection) dateSection.classList.add('hidden');
+        if (dateSectionDropdown) dateSectionDropdown.classList.add('hidden');
         return;
     }
     
-    dateSection.classList.remove('hidden');
+    if (dateSection) dateSection.classList.remove('hidden');
+    if (dateSectionDropdown) dateSectionDropdown.classList.remove('hidden');
     
     // Set date range
     if (dataset.date_range_start && dataset.date_range_end) {
         const start = new Date(dataset.date_range_start).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
         const end = new Date(dataset.date_range_end).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
-        dateRangeInfo.textContent = `(${start} - ${end})`;
+        const rangeText = `(${start} - ${end})`;
         
-        // Set min/max on date picker
-        datePicker.min = dataset.date_range_start;
-        datePicker.max = dataset.date_range_end;
+        if (dateRangeInfo) dateRangeInfo.textContent = rangeText;
+        if (dateRangeInfoDropdown) dateRangeInfoDropdown.textContent = rangeText;
+        
+        // Set min/max on both date pickers
+        if (datePicker) {
+            datePicker.min = dataset.date_range_start;
+            datePicker.max = dataset.date_range_end;
+        }
+        if (datePickerDropdown) {
+            datePickerDropdown.min = dataset.date_range_start;
+            datePickerDropdown.max = dataset.date_range_end;
+        }
     } else {
-        dateRangeInfo.textContent = '';
+        if (dateRangeInfo) dateRangeInfo.textContent = '';
+        if (dateRangeInfoDropdown) dateRangeInfoDropdown.textContent = '';
     }
     
     // Set default value
     if (dataset.default_date) {
-        datePicker.value = dataset.default_date;
-        AppState.currentDate = dataset.default_date;
+        const dateValue = dataset.default_date;
+        if (datePicker) datePicker.value = dateValue;
+        if (datePickerDropdown) datePickerDropdown.value = dateValue;
+        AppState.currentDate = dateValue;
     }
 }
 
@@ -1358,11 +1423,22 @@ function initializeEventListeners() {
     // Note: Subject cards are now rendered dynamically in renderCategoriesWithSubjects()
     // Event listeners are added there
     
-    // Date picker
+    // Date pickers (both panel and dropdown)
     const datePicker = document.getElementById('date-picker');
+    const datePickerDropdown = document.getElementById('date-picker-dropdown');
+    
     datePicker.value = AppState.currentDate;
+    datePickerDropdown.value = AppState.currentDate;
+    
     datePicker.addEventListener('change', (e) => {
         AppState.currentDate = e.target.value;
+        datePickerDropdown.value = e.target.value;
+        updateBaseLayer();
+    });
+    
+    datePickerDropdown.addEventListener('change', (e) => {
+        AppState.currentDate = e.target.value;
+        datePicker.value = e.target.value;
         updateBaseLayer();
     });
     
@@ -1431,6 +1507,29 @@ function initializeEventListeners() {
     document.getElementById('btn-suggestions').addEventListener('click', () => {
         const popover = document.getElementById('suggestions-popover');
         popover.classList.toggle('hidden');
+    });
+    
+    // Dataset dropdown button
+    document.getElementById('btn-dataset-dropdown').addEventListener('click', () => {
+        const dropdown = document.getElementById('dataset-dropdown');
+        const btn = document.getElementById('btn-dataset-dropdown');
+        
+        dropdown.classList.toggle('hidden');
+        btn.classList.toggle('active');
+        
+        // Close other popovers
+        document.getElementById('suggestions-popover').classList.add('hidden');
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        const dropdown = document.getElementById('dataset-dropdown');
+        const btn = document.getElementById('btn-dataset-dropdown');
+        
+        if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
+            dropdown.classList.add('hidden');
+            btn.classList.remove('active');
+        }
     });
     
     // Tool buttons - work with any loaded dataset

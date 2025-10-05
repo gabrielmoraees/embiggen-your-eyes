@@ -110,18 +110,10 @@ body {
     gap: var(--spacing-sm);
 }
 
-.app-title {
-    font-size: 17px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    letter-spacing: -0.4px;
-}
-
-.app-title .material-icons-round {
-    font-size: 24px;
-    color: var(--ios-blue);
+.app-logo {
+    height: 24px;
+    width: auto;
+    display: block;
 }
 
 .top-bar-right {
@@ -139,6 +131,85 @@ body {
     border-radius: 12px;
     font-size: 13px;
     font-weight: 500;
+}
+
+/* Dataset Button in Top Bar */
+.dataset-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: 8px 16px;
+    border: none;
+    border-radius: var(--radius-lg);
+    color: var(--sys-fg);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.dataset-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.dataset-btn:active {
+    transform: translateY(0);
+}
+
+.dataset-btn .material-icons-round:first-child {
+    font-size: 20px;
+}
+
+.dataset-btn .material-icons-round:last-child {
+    font-size: 18px;
+    transition: transform var(--transition-fast);
+}
+
+.dataset-btn.active .material-icons-round:last-child {
+    transform: rotate(180deg);
+}
+
+.dataset-btn-label {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Dataset Dropdown Menu */
+.dataset-dropdown {
+    position: fixed;
+    top: 80px;
+    right: var(--spacing-md);
+    width: 400px;
+    max-height: 70vh;
+    overflow-y: auto;
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-lg);
+    z-index: 999;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    transition: all var(--transition-normal);
+}
+
+.dataset-dropdown:not(.hidden) {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: all;
+}
+
+.dropdown-header {
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.dropdown-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
 }
 
 .status-dot {
@@ -209,6 +280,10 @@ body {
     max-height: 80vh;
     display: flex;
     flex-direction: column;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-bottom: none;
 }
 
 .bottom-sheet.collapsed {
@@ -220,11 +295,6 @@ body {
     display: flex;
     justify-content: center;
     cursor: grab;
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px) saturate(180%);
-    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    border: 1px solid var(--glass-border);
-    border-bottom: none;
 }
 
 .sheet-handle:active {
@@ -243,10 +313,6 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid var(--glass-border);
-    border-top: none;
 }
 
 /* Quick Actions Bar */
@@ -254,7 +320,6 @@ body {
     display: flex;
     gap: var(--spacing-xs);
     padding: var(--spacing-md);
-    border-bottom: 1px solid var(--glass-border);
     overflow-x: auto;
     scrollbar-width: none;
 }
@@ -264,7 +329,7 @@ body {
 }
 
 .action-btn {
-    flex-shrink: 0;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -278,6 +343,7 @@ body {
     transition: all var(--transition-fast);
     font-size: 11px;
     font-weight: 500;
+    width: 100px;
 }
 
 .action-btn:hover {
@@ -1083,8 +1149,8 @@ body {
         right: var(--spacing-sm);
     }
     
-    .app-title {
-        font-size: 15px;
+    .app-logo {
+        height: 20px;
     }
     
     .body-grid {
