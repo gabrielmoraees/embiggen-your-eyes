@@ -130,7 +130,7 @@ function initializeMap() {
     center: [0, 0],
     zoom: 2,
     minZoom: 1,
-            maxZoom: 12,
+            maxZoom: 18,  // Default max zoom, will be updated per dataset
             zoomControl: false,
     attributionControl: true
 });
@@ -444,7 +444,7 @@ function createTileLayer(tileUrl, maxZoom = 18, attribution = '© NASA') {
     return tileLayer;
 }
 
-async function updateBaseLayer() {
+async function updateBaseLayer(resetView = false) {
     if (!AppState.currentDataset || !AppState.currentVariant) {
         console.warn('No dataset or variant selected');
         return;
@@ -476,13 +476,23 @@ async function updateBaseLayer() {
         const source = AppState.sources.find(s => s.id === AppState.currentDataset.source_id);
         const attribution = source ? source.attribution : '© NASA';
         
+        // Update map's max zoom to respect the variant's capabilities
+        const maxZoom = variant.max_zoom || 18;
+        map.setMaxZoom(maxZoom);
+        
         // Create new base layer with z-index 0
-        gibsLayer = createTileLayer(variant.tile_url, variant.max_zoom || 18, attribution);
+        gibsLayer = createTileLayer(variant.tile_url, maxZoom, attribution);
         gibsLayer.setZIndex(0);
     gibsLayer.addTo(map);
     
         // Store reference
         AppState.baseTileLayer = gibsLayer;
+        
+        // Reset view if requested (new dataset selected)
+        if (resetView) {
+            map.setView([0, 0], 2);
+            console.log('🔄 View reset to default position and zoom');
+        }
         
         // Update UI
         const baseLayerName = document.getElementById('base-layer-name');
@@ -497,7 +507,7 @@ async function updateBaseLayer() {
         updateLayerStacking();
         
         showStatus('Map loaded', 'success');
-        console.log(`Loaded: ${AppState.currentDataset.name} - ${variant.name}`);
+        console.log(`Loaded: ${AppState.currentDataset.name} - ${variant.name} (max zoom: ${maxZoom})`);
     } catch (error) {
         console.error('Failed to update base layer:', error);
         showStatus('Failed to load map', 'error');
@@ -1268,8 +1278,8 @@ function renderCategoriesWithSubjects() {
                     // Update date picker visibility
                     updateDatePickerVisibility(datasets[0]);
                     
-                    // Update map with selected dataset
-                    await updateBaseLayer();
+                    // Update map with selected dataset and reset view
+                    await updateBaseLayer(true);
                 }
             }
             
@@ -1388,8 +1398,8 @@ function renderDatasetsInContainer(datasets, container) {
                 // Show/hide date picker based on time-series support
                 updateDatePickerVisibility(dataset);
                 
-                // Update map
-                await updateBaseLayer();
+                // Update map and reset view
+                await updateBaseLayer(true);
             }
             
             // Update breadcrumb
@@ -3025,8 +3035,8 @@ async function selectImportedDataset(datasetId, category, subject, shouldCloseMo
             // Update date picker visibility
             updateDatePickerVisibility(dataset);
             
-            // Update the base layer with the new dataset
-            await updateBaseLayer();
+            // Update the base layer with the new dataset and reset view
+            await updateBaseLayer(true);
             
             console.log(`✅ Dataset ${datasetId} loaded and displayed on map!`);
             showStatus('Dataset loaded successfully!', 'success');
