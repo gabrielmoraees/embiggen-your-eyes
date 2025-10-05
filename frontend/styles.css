@@ -1772,6 +1772,253 @@ body {
 }
 
 /* ============================================
+   Import Gigapixel Modal
+   ============================================ */
+.panel-header-flex {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+}
+
+.import-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    padding: 0 var(--spacing-md);
+    height: 48px;
+    margin-top: var(--spacing-lg);
+    width: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-md);
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.import-btn:hover {
+    background: rgba(0, 0, 0, 0.8);
+    border-color: var(--ios-blue);
+    box-shadow: 0 2px 8px rgba(12, 140, 233, 0.3);
+    transform: translateY(-1px);
+}
+
+.import-btn .material-icons-round {
+    font-size: 18px;
+}
+
+/* Mobile: hide button text, show only icon */
+@media (max-width: 768px) {
+    .import-btn span:not(.material-icons-round) {
+        display: none;
+    }
+    
+    .import-btn {
+        padding: var(--spacing-sm);
+        min-width: 40px;
+        justify-content: center;
+    }
+}
+
+.panel-header-content {
+    flex: 1;
+}
+
+.import-method-selector {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+}
+
+.method-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-md);
+    background: var(--glass-bg);
+    border: 1px solid var(--sys-divider);
+    border-radius: var(--radius-md);
+    color: var(--sys-fg-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.method-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--ios-blue);
+}
+
+.method-btn.active {
+    background: rgba(12, 140, 233, 0.15);
+    border-color: var(--ios-blue);
+    color: var(--ios-blue);
+}
+
+.import-input-section {
+    margin-bottom: var(--spacing-lg);
+}
+
+.input-hint {
+    font-size: 12px;
+    color: var(--sys-fg-tertiary);
+    margin: var(--spacing-xs) 0 0 0;
+}
+
+.file-upload-area {
+    padding: var(--spacing-xl);
+    background: var(--glass-bg);
+    border: 2px dashed var(--sys-divider);
+    border-radius: var(--radius-md);
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.file-upload-area:hover {
+    border-color: var(--ios-blue);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.file-upload-area .material-icons-round {
+    font-size: 48px;
+    color: var(--sys-fg-tertiary);
+    display: block;
+    margin: 0 auto var(--spacing-sm) auto;
+}
+
+.file-upload-area p {
+    margin: var(--spacing-xs) 0;
+    color: var(--sys-fg-secondary);
+}
+
+.file-upload-area .file-name {
+    color: var(--ios-blue);
+    font-weight: 500;
+    margin-top: var(--spacing-md);
+}
+
+.import-details-section {
+    margin-bottom: var(--spacing-lg);
+}
+
+.import-details-section .glass-input {
+    margin-bottom: var(--spacing-md);
+}
+
+.import-filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+}
+
+.filter-group {
+    display: flex;
+        flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.import-status {
+    margin-top: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    background: var(--glass-bg);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--sys-divider);
+}
+
+.status-indicator {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+}
+
+.spinner {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--ios-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.status-text-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.status-main-text {
+    margin: 0;
+    color: var(--sys-fg-primary);
+    font-weight: 500;
+    font-size: 15px;
+}
+
+.status-sub-text {
+    margin: 0;
+    color: var(--sys-fg-tertiary);
+    font-size: 13px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: var(--spacing-xs);
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--ios-blue), #5AB9EA);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.3s ease;
+    animation: indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes indeterminate {
+    0% {
+        width: 0%;
+        margin-left: 0%;
+    }
+    50% {
+        width: 50%;
+        margin-left: 25%;
+    }
+    100% {
+        width: 0%;
+        margin-left: 100%;
+    }
+}
+
+/* Mobile adjustments for import modal */
+@media (max-width: 768px) {
+    .import-filters {
+        grid-template-columns: 1fr;
+    }
+    
+    .import-method-selector {
+        flex-direction: column;
+    }
+}
+
+/* ============================================
    Dark Mode Adjustments (Always Dark)
    ============================================ */
 @media (prefers-color-scheme: dark) {

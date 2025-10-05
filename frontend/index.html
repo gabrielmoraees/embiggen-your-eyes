@@ -77,6 +77,10 @@
                     <div id="categories-list" class="categories-list">
                         <!-- Dynamically populated -->
                     </div>
+                    <button class="import-btn" id="btn-import-gigapixel" title="Import Gigapixel Image">
+                        <span class="material-icons-round">cloud_upload</span>
+                        <span>Import Gigapixel Image</span>
+                    </button>
                 </div>
                 
                 <!-- Datasets Panel -->
@@ -369,6 +373,93 @@
                     <span class="material-icons-round">add</span>
                     Add Overlay Layer
                 </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Import Gigapixel Image Modal -->
+    <div class="overlay-dataset-modal hidden" id="import-gigapixel-modal">
+        <div class="modal-header">
+            <h4 class="modal-title">Import Gigapixel Image</h4>
+            <button class="icon-btn" id="btn-close-import-modal">
+                <span class="material-icons-round">close</span>
+            </button>
+        </div>
+        <div class="modal-content">
+            <p class="modal-subtitle">Upload a high-resolution image or provide a URL to create a custom dataset</p>
+            
+            <!-- Input Method Selection -->
+            <div class="import-method-selector">
+                <button class="method-btn active" data-method="url">
+                    <span class="material-icons-round">link</span>
+                    <span>From URL</span>
+                </button>
+                <button class="method-btn" data-method="file">
+                    <span class="material-icons-round">upload_file</span>
+                    <span>Upload File</span>
+                </button>
+            </div>
+            
+            <!-- URL Input -->
+            <div class="import-input-section" id="import-url-section">
+                <label class="input-label">Image URL</label>
+                <input type="text" id="import-url-input" class="glass-input" placeholder="https://example.com/image.jpg" />
+                <p class="input-hint">Supports: JPG, PNG, TIFF, GeoTIFF</p>
+            </div>
+            
+            <!-- File Upload -->
+            <div class="import-input-section hidden" id="import-file-section">
+                <label class="input-label">Select Image File</label>
+                <div class="file-upload-area" id="file-upload-area">
+                    <input type="file" id="file-upload-input" accept="image/*,.tif,.tiff,.geotiff" hidden />
+                    <span class="material-icons-round">cloud_upload</span>
+                    <p>Click to browse or drag & drop</p>
+                    <p class="file-name" id="selected-file-name"></p>
+                </div>
+            </div>
+            
+            <!-- Dataset Details -->
+            <div class="import-details-section">
+                <label class="input-label">Dataset Name</label>
+                <input type="text" id="import-name-input" class="glass-input" placeholder="My Custom Dataset" />
+                
+                <label class="input-label">Description (Optional)</label>
+                <input type="text" id="import-description-input" class="glass-input" placeholder="Description of the image" />
+                
+                <div class="import-filters">
+                    <div class="filter-group">
+                        <label class="input-label">Category</label>
+                        <select class="glass-select" id="import-category-select">
+                            <option value="">Select Category</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="input-label">Subject</label>
+                        <select class="glass-select" id="import-subject-select">
+                            <option value="">Select Subject</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Import Button -->
+            <button class="glass-button primary" id="btn-import-submit" disabled>
+                <span class="material-icons-round">cloud_upload</span>
+                Import Dataset
+            </button>
+            
+            <!-- Processing Status -->
+            <div class="import-status hidden" id="import-status">
+                <div class="status-indicator">
+                    <div class="spinner"></div>
+                    <div class="status-text-container">
+                        <p id="import-status-text" class="status-main-text">Processing image...</p>
+                        <p id="import-status-subtext" class="status-sub-text">This may take a few minutes</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="import-progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

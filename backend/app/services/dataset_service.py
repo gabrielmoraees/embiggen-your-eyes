@@ -156,9 +156,10 @@ class DatasetService:
                 "source_url": image_url,
                 "status": "processing"
             }
-            # Tiles not ready yet - use placeholder
-            tile_url_template = f"http://localhost:8000/api/tile-placeholder/{tile_id}"
-            thumbnail_url = tile_url_template
+            # Tiles not ready yet - URLs will be updated after processing
+            # Use empty template that will be replaced when ready
+            tile_url_template = ""
+            thumbnail_url = ""
         
         # Create variant
         variant = Variant(

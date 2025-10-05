@@ -64,6 +64,11 @@ class Dataset(BaseModel):
     bbox: Optional[Dict[str, float]] = None  # Geographic extent
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
+    
+    # Processing-related fields (for custom uploaded datasets)
+    processing_status: Optional[str] = None  # "processing", "ready", "failed"
+    tile_id: Optional[str] = None  # ID for tile processor tracking
+    image_url: Optional[str] = None  # Original image URL
 
 
 class View(BaseModel):

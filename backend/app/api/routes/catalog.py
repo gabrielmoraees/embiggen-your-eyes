@@ -12,8 +12,32 @@ router = APIRouter()
 
 @router.get("/categories")
 def get_categories():
-    """Get list of available categories"""
+    """Get list of available categories (only those with datasets)"""
     return CatalogService.get_categories()
+
+
+@router.get("/categories/all")
+def get_all_categories():
+    """Get all possible categories from enums, regardless of dataset availability"""
+    categories = []
+    for category in Category:
+        categories.append({
+            "id": category.value,
+            "name": category.value.replace('_', ' ').title()
+        })
+    return {"categories": categories}
+
+
+@router.get("/subjects/all")
+def get_all_subjects():
+    """Get all possible subjects from enums, regardless of dataset availability"""
+    subjects = []
+    for subject in Subject:
+        subjects.append({
+            "id": subject.value,
+            "name": subject.value.replace('_', ' ').title()
+        })
+    return {"subjects": subjects}
 
 
 @router.get("/sources")

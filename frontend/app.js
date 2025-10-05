@@ -814,7 +814,7 @@ function displayAnnotationOnMap(annotation, autoOpenPopup = false) {
         // Auto-open popup for newly created annotations
         if (autoOpenPopup) {
             console.log('🗺️ Auto-opening popup in 100ms...');
-            setTimeout(() => {
+                setTimeout(() => {
                 layer.openPopup();
                 console.log('🗺️ Popup opened!');
             }, 100);
@@ -1649,7 +1649,7 @@ function renderAnnotationsList(annotations) {
         item.innerHTML = `
             <div class="list-item-icon">
                 <span class="material-icons-round">${icons[ann.type] || 'place'}</span>
-            </div>
+        </div>
             <div class="list-item-info">
                 <div class="list-item-title editable" data-annotation-id="${ann.id}" contenteditable="false" spellcheck="false">${ann.text || 'Annotation'}</div>
                 <div class="list-item-desc">${ann.type}</div>
@@ -2283,8 +2283,82 @@ function initializeEventListeners() {
         // Close modal
         closeOverlayDatasetModal();
         
-        // Add the overlay layer with configuration
+        // Add the overlay layer
         await addOverlayLayer(selectedOverlayDataset.id, selectedOverlayVariant.id, date);
+    });
+    
+    // Import Gigapixel Image button
+    document.getElementById('btn-import-gigapixel').addEventListener('click', () => {
+        openImportGigapixelModal();
+    });
+    
+    // Close import modal button
+    document.getElementById('btn-close-import-modal').addEventListener('click', () => {
+        closeImportGigapixelModal();
+    });
+    
+    // Import modal backdrop (prevent closing when clicking inside modal)
+    const importModal = document.getElementById('import-gigapixel-modal');
+    importModal.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+    
+    // Import method selector buttons
+    document.querySelectorAll('.method-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            switchImportMethod(btn.dataset.method);
+        });
+    });
+    
+    // File upload area
+    const fileUploadArea = document.getElementById('file-upload-area');
+    const fileInput = document.getElementById('file-upload-input');
+    
+    fileUploadArea.addEventListener('click', () => {
+        fileInput.click();
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            selectedFile = e.target.files[0];
+            document.getElementById('selected-file-name').textContent = selectedFile.name;
+            validateImportForm();
+        }
+    });
+    
+    // Drag and drop for file upload
+    fileUploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        fileUploadArea.style.borderColor = 'var(--ios-blue)';
+    });
+    
+    fileUploadArea.addEventListener('dragleave', () => {
+        fileUploadArea.style.borderColor = '';
+    });
+    
+    fileUploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        fileUploadArea.style.borderColor = '';
+        
+        if (e.dataTransfer.files.length > 0) {
+            selectedFile = e.dataTransfer.files[0];
+            document.getElementById('selected-file-name').textContent = selectedFile.name;
+            validateImportForm();
+        }
+    });
+    
+    // Import form inputs validation
+    document.getElementById('import-url-input').addEventListener('input', validateImportForm);
+    document.getElementById('import-name-input').addEventListener('input', validateImportForm);
+    document.getElementById('import-category-select').addEventListener('change', () => {
+        updateImportSubjects();
+        validateImportForm();
+    });
+    document.getElementById('import-subject-select').addEventListener('change', validateImportForm);
+    
+    // Import submit button
+    document.getElementById('btn-import-submit').addEventListener('click', () => {
+        submitImportGigapixel();
     });
     
     // Date picker change handler
@@ -2490,6 +2564,495 @@ function switchPanel(panelId) {
 // Make functions globally accessible
 window.removeOverlayLayer = removeOverlayLayer;
 window.deleteAnnotation = deleteAnnotation;
+
+// ============================================================================
+// Import Gigapixel Image
+// ============================================================================
+
+let importMethod = 'url'; // 'url' or 'file'
+let selectedFile = null;
+
+async function openImportGigapixelModal() {
+    const modal = document.getElementById('import-gigapixel-modal');
+    const backdrop = document.getElementById('modal-backdrop');
+    
+    // Reset form
+    document.getElementById('import-url-input').value = '';
+    document.getElementById('import-name-input').value = '';
+    document.getElementById('import-description-input').value = '';
+    document.getElementById('import-category-select').value = '';
+    document.getElementById('import-subject-select').value = '';
+    document.getElementById('selected-file-name').textContent = '';
+    selectedFile = null;
+    
+    // Load ALL categories from backend (not just ones with datasets)
+    try {
+        const categoriesResponse = await fetch(`${BACKEND_URL}/api/categories/all`);
+        const categoriesData = await categoriesResponse.json();
+        
+        // Populate category dropdown with ALL categories
+        const categorySelect = document.getElementById('import-category-select');
+        categorySelect.innerHTML = '<option value="">Select Category</option>';
+        categoriesData.categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat.id;
+            option.textContent = cat.name;
+            categorySelect.appendChild(option);
+        });
+        
+        console.log(`✅ Loaded ${categoriesData.categories.length} categories for import`);
+    } catch (error) {
+        console.error('Failed to load categories:', error);
+        // Fallback to current categories if API fails
+        const categorySelect = document.getElementById('import-category-select');
+        categorySelect.innerHTML = '<option value="">Select Category</option>';
+        AppState.categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat.id;
+            option.textContent = cat.name;
+            categorySelect.appendChild(option);
+        });
+    }
+    
+    // Show modal
+    modal.classList.remove('hidden');
+    backdrop.classList.remove('hidden');
+    
+    validateImportForm();
+}
+
+function closeImportGigapixelModal() {
+    const modal = document.getElementById('import-gigapixel-modal');
+    const backdrop = document.getElementById('modal-backdrop');
+    
+    modal.classList.add('hidden');
+    backdrop.classList.add('hidden');
+    
+    // Hide status section
+    document.getElementById('import-status').classList.add('hidden');
+}
+
+function switchImportMethod(method) {
+    importMethod = method;
+    
+    // Update button states
+    document.querySelectorAll('.method-btn').forEach(btn => {
+        if (btn.dataset.method === method) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    
+    // Toggle input sections
+    if (method === 'url') {
+        document.getElementById('import-url-section').classList.remove('hidden');
+        document.getElementById('import-file-section').classList.add('hidden');
+    } else {
+        document.getElementById('import-url-section').classList.add('hidden');
+        document.getElementById('import-file-section').classList.remove('hidden');
+    }
+    
+    validateImportForm();
+}
+
+async function updateImportSubjects() {
+    const categoryId = document.getElementById('import-category-select').value;
+    const subjectSelect = document.getElementById('import-subject-select');
+    
+    subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+    
+    if (!categoryId) {
+        subjectSelect.disabled = true;
+        validateImportForm();
+        return;
+    }
+    
+    subjectSelect.disabled = false;
+    
+    // Define category-to-subject mapping (matches backend)
+    const categorySubjectMap = {
+        'planets': ['earth', 'mars', 'mercury', 'venus', 'jupiter', 'saturn', 'uranus', 'neptune'],
+        'satellites': ['moon', 'europa', 'titan', 'enceladus'],
+        'galaxies': ['milky_way', 'andromeda'],
+        'dwarf_planets': [],
+        'nebulae': [],
+        'star_clusters': [],
+        'phenomena': [],
+        'regions': []
+    };
+    
+    // Load ALL subjects from backend
+    try {
+        const subjectsResponse = await fetch(`${BACKEND_URL}/api/subjects/all`);
+        const subjectsData = await subjectsResponse.json();
+        
+        // Filter subjects based on selected category
+        const allowedSubjects = categorySubjectMap[categoryId] || [];
+        
+        let filteredCount = 0;
+        subjectsData.subjects.forEach(subject => {
+            // Only show subjects that belong to this category
+            if (allowedSubjects.length === 0 || allowedSubjects.includes(subject.id)) {
+                const option = document.createElement('option');
+                option.value = subject.id;
+                option.textContent = subject.name;
+                subjectSelect.appendChild(option);
+                filteredCount++;
+            }
+        });
+        
+        console.log(`✅ Loaded ${filteredCount} subjects for category "${categoryId}"`);
+    } catch (error) {
+        console.error('Failed to load subjects:', error);
+        // Fallback to existing logic
+        const subjects = new Set();
+        AppState.allDatasets
+            .filter(ds => ds.category === categoryId)
+            .forEach(ds => subjects.add(ds.subject));
+        
+        Array.from(subjects).sort().forEach(subject => {
+            const option = document.createElement('option');
+            option.value = subject;
+            option.textContent = subject.charAt(0).toUpperCase() + subject.slice(1).replace('_', ' ');
+            subjectSelect.appendChild(option);
+        });
+    }
+    
+    validateImportForm();
+}
+
+function validateImportForm() {
+    const name = document.getElementById('import-name-input').value.trim();
+    const category = document.getElementById('import-category-select').value;
+    const subject = document.getElementById('import-subject-select').value;
+    const submitBtn = document.getElementById('btn-import-submit');
+    
+    let hasSource = false;
+    if (importMethod === 'url') {
+        const url = document.getElementById('import-url-input').value.trim();
+        hasSource = url.length > 0;
+    } else {
+        hasSource = selectedFile !== null;
+    }
+    
+    const isValid = name && category && subject && hasSource;
+    submitBtn.disabled = !isValid;
+}
+
+async function submitImportGigapixel() {
+    const name = document.getElementById('import-name-input').value.trim();
+    const description = document.getElementById('import-description-input').value.trim();
+    const category = document.getElementById('import-category-select').value;
+    const subject = document.getElementById('import-subject-select').value;
+    
+    // Show status
+    const statusDiv = document.getElementById('import-status');
+    const statusText = document.getElementById('import-status-text');
+    statusDiv.classList.remove('hidden');
+    statusText.textContent = 'Creating dataset...';
+    
+    // Disable submit button and form inputs
+    document.getElementById('btn-import-submit').disabled = true;
+    document.querySelectorAll('.import-input-section input, .import-input-section select').forEach(el => {
+        el.disabled = true;
+    });
+    
+    try {
+        let imageUrl;
+        
+        if (importMethod === 'url') {
+            imageUrl = document.getElementById('import-url-input').value.trim();
+        } else {
+            // Upload file first
+            statusText.textContent = 'Uploading file...';
+            imageUrl = await uploadImageFile(selectedFile);
+        }
+        
+        statusText.textContent = 'Creating dataset...';
+        
+        // Create dataset via API (returns immediately)
+        const response = await apiRequest('/api/datasets', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: name,
+                description: description || undefined,
+                category: category,
+                subject: subject,
+                url: imageUrl
+            })
+        });
+        
+        if (response.success) {
+            const datasetId = response.dataset_id;
+            const status = response.status || 'ready';
+            
+            console.log(`✅ Dataset created: ${datasetId}, status: ${status}`);
+            
+            if (status === 'processing') {
+                statusText.textContent = 'Processing image...';
+                showStatus('Processing image tiles...', 'info');
+                
+                // Wait for processing to complete (keep modal open)
+                try {
+                    await pollDatasetStatus(datasetId, category, subject);
+                    // If we get here, processing completed successfully
+                    // selectImportedDataset was called from within pollDatasetStatus
+                    // Now close the modal
+                    setTimeout(() => {
+                        closeImportGigapixelModal();
+                    }, 1500);
+                } catch (pollError) {
+                    // Polling failed or timed out
+                    throw pollError;
+                }
+            } else {
+                // Dataset ready immediately (pre-tiled service)
+                statusText.textContent = 'Dataset ready!';
+                showStatus('Dataset imported successfully!', 'success');
+                
+                // Select and load the new dataset (will close modal automatically)
+                await selectImportedDataset(datasetId, category, subject, true);
+            }
+        } else {
+            throw new Error(response.error || 'Failed to create dataset');
+        }
+    } catch (error) {
+        console.error('Failed to import gigapixel image:', error);
+        statusText.textContent = '❌ Import failed: ' + error.message;
+        showStatus('Import failed', 'error');
+        
+        // Re-enable form after delay
+        setTimeout(() => {
+            document.getElementById('btn-import-submit').disabled = false;
+            document.querySelectorAll('.import-input-section input, .import-input-section select').forEach(el => {
+                el.disabled = false;
+            });
+        }, 3000);
+    }
+}
+
+async function uploadImageFile(file) {
+    // For now, return a placeholder URL
+    // In production, you'd upload to a cloud storage service
+    console.log('File upload not yet implemented. File:', file.name);
+    throw new Error('File upload is not yet implemented. Please use URL method.');
+}
+
+async function pollDatasetStatus(datasetId, category, subject) {
+    const statusText = document.getElementById('import-status-text');
+    const statusSubtext = document.getElementById('import-status-subtext');
+    let pollCount = 0;
+    const maxPolls = 180; // 6 minutes max (180 * 2 seconds)
+    
+    return new Promise((resolve, reject) => {
+        const checkStatus = async () => {
+            try {
+                pollCount++;
+                const elapsedSeconds = pollCount * 2;
+                const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+                const elapsedSecondsRemainder = elapsedSeconds % 60;
+                
+                console.log(`📊 Polling status for ${datasetId} (attempt ${pollCount})`);
+                
+                const response = await fetch(`${BACKEND_URL}/api/datasets/${datasetId}/status`);
+                
+                if (!response.ok) {
+                    throw new Error(`Status check failed: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Status response:', data);
+                
+                if (data.status === 'ready') {
+                    // Processing complete!
+                    statusText.textContent = '✅ Dataset ready!';
+                    statusSubtext.textContent = '100% complete • Loading dataset on map...';
+                    showStatus('Dataset processed successfully!', 'success');
+                    
+                    // Set progress bar to 100%
+                    const progressFill = document.getElementById('import-progress-fill');
+                    if (progressFill) {
+                        progressFill.style.width = '100%';
+                        progressFill.style.animation = 'none';
+                    }
+                    
+                    console.log(`✅ Dataset ${datasetId} is ready!`);
+                    
+                    // Select and load the new dataset (don't close modal yet)
+                    try {
+                        await selectImportedDataset(datasetId, category, subject, false); // Pass false to not close modal
+                        resolve(data);
+                    } catch (error) {
+                        reject(error);
+                    }
+                    
+                } else if (data.status === 'processing') {
+                    // Still processing - show detailed progress
+                    const progress = data.progress || '';
+                    const percentage = data.percentage || 0;
+                    const message = data.message || 'Processing...';
+                    
+                    // Update progress bar
+                    const progressFill = document.getElementById('import-progress-fill');
+                    if (progressFill) {
+                        progressFill.style.width = `${percentage}%`;
+                        progressFill.style.animation = 'none'; // Remove indeterminate animation
+                    }
+                    
+                    // Update main text with icon based on progress
+                    let icon = '⏳';
+                    if (progress === 'downloading') {
+                        icon = '⬇️';
+                    } else if (progress === 'generating_tiles') {
+                        icon = '🔨';
+                    } else if (progress === 'queued') {
+                        icon = '⏱️';
+                    } else if (progress === 'finalizing') {
+                        icon = '✨';
+                    }
+                    
+                    statusText.textContent = `${icon} ${message}`;
+                    
+                    // Update subtext with percentage and elapsed time
+                    const timeStr = elapsedMinutes > 0 
+                        ? `${elapsedMinutes}m ${elapsedSecondsRemainder}s`
+                        : `${elapsedSeconds}s`;
+                    statusSubtext.textContent = `${percentage}% complete • ${timeStr} elapsed`;
+                    
+                    // Check if we've exceeded max polls
+                    if (pollCount >= maxPolls) {
+                        throw new Error('Processing timeout - taking too long');
+                    }
+                    
+                    // Continue polling
+                    setTimeout(checkStatus, 2000); // Check again in 2 seconds
+                    
+                } else if (data.status === 'failed' || data.status === 'error') {
+                    // Processing failed - show detailed error
+                    const errorMsg = data.error || data.message || 'Processing failed';
+                    statusText.textContent = `❌ Processing failed`;
+                    statusSubtext.textContent = errorMsg;
+                    showStatus('Failed to process dataset', 'error');
+                    
+                    // Reset progress bar to 0
+                    const progressFill = document.getElementById('import-progress-fill');
+                    if (progressFill) {
+                        progressFill.style.width = '0%';
+                        progressFill.style.animation = 'none';
+                    }
+                    
+                    console.error(`❌ Dataset ${datasetId} processing failed:`, errorMsg);
+                    reject(new Error(errorMsg));
+                    
+                } else {
+                    // Unknown status
+                    console.warn('Unknown status:', data.status);
+                    statusText.textContent = '⏳ Processing...';
+                    statusSubtext.textContent = `Status: ${data.status}`;
+                    setTimeout(checkStatus, 2000);
+                }
+                
+            } catch (error) {
+                console.error('Failed to check dataset status:', error);
+                
+                // Retry a few times on network errors
+                if (pollCount < 5) {
+                    statusText.textContent = '⚠️ Connection issue...';
+                    statusSubtext.textContent = 'Retrying...';
+                    setTimeout(checkStatus, 3000); // Retry in 3 seconds
+                } else {
+                    statusText.textContent = '❌ Failed to check status';
+                    statusSubtext.textContent = error.message || 'Network error';
+                    showStatus('Status check failed', 'error');
+                    reject(error);
+                }
+            }
+        };
+        
+        // Start polling
+        checkStatus();
+    });
+}
+
+async function selectImportedDataset(datasetId, category, subject, shouldCloseModal = true) {
+    try {
+        console.log(`🎯 Selecting imported dataset: ${datasetId}`);
+        
+        // Fetch the complete dataset details
+        const dataset = await apiRequest(`/api/datasets/${datasetId}`);
+        console.log('Dataset details:', dataset);
+        
+        // Check if dataset is still processing
+        if (dataset.processing_status === 'processing') {
+            console.warn('⚠️ Dataset is still processing, cannot load yet');
+            showStatus('Dataset is still processing...', 'warning');
+            return; // Don't try to load it yet
+        }
+        
+        // Check if processing failed
+        if (dataset.processing_status === 'failed') {
+            console.error('❌ Dataset processing failed');
+            showStatus('Dataset processing failed', 'error');
+            throw new Error('Dataset processing failed');
+        }
+        
+        // Update AppState
+        AppState.currentCategory = category;
+        AppState.currentSubject = subject;
+        AppState.currentDataset = dataset;
+        
+        // Load variants for this dataset
+        const variants = await loadDatasetVariants(datasetId);
+        console.log('Dataset variants:', variants);
+        
+        if (variants && variants.length > 0) {
+            // Check if variant has valid tile URL
+            const defaultVariant = variants.find(v => v.is_default) || variants[0];
+            
+            if (!defaultVariant.tile_url_template || defaultVariant.tile_url_template === '') {
+                console.warn('⚠️ Variant has no tile URL yet');
+                showStatus('Tiles not ready yet...', 'warning');
+                return; // Don't try to load without tile URLs
+            }
+            
+            // Select default or first variant
+            AppState.currentVariant = defaultVariant;
+            
+            // Render variant selector
+            renderVariantSelector(variants);
+            
+            // Update date picker visibility
+            updateDatePickerVisibility(dataset);
+            
+            // Update the base layer with the new dataset
+            await updateBaseLayer();
+            
+            console.log(`✅ Dataset ${datasetId} loaded and displayed on map!`);
+            showStatus('Dataset loaded successfully!', 'success');
+        }
+        
+        // Reload catalog to show the new dataset in lists
+        await loadCategories();  // Reload categories first (includes new category if needed)
+        await loadDatasets();    // Then reload datasets
+        renderCategoriesWithSubjects();  // Re-render the explore panel
+        
+        // Update breadcrumb
+        updateBreadcrumb();
+        
+        // Close modal after successful load (if requested)
+        if (shouldCloseModal) {
+            setTimeout(() => {
+                closeImportGigapixelModal();
+            }, 1500);
+        }
+        
+    } catch (error) {
+        console.error('Failed to select imported dataset:', error);
+        showStatus('Failed to load dataset', 'error');
+        throw error; // Re-throw to let caller handle it
+    }
+}
 
 // ============================================================================
 // Application Initialization

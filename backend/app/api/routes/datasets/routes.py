@@ -4,6 +4,7 @@ Dataset API routes - CRUD operations and dataset management
 from fastapi import APIRouter, HTTPException
 from typing import Optional
 from datetime import date, datetime
+import logging
 
 from app.models.enums import Category, Subject, SourceId
 from app.models.schemas import DatasetCreateRequest, DatasetUpdateRequest, Dataset
@@ -11,6 +12,8 @@ from app.services.catalog_service import CatalogService
 from app.services.variant_service import VariantService
 from app.services.dataset_service import DatasetService
 from app.data.storage import DATASETS
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -81,14 +84,35 @@ def get_dataset_status(dataset_id: str):
     tile_info = tile_index.get(tile_id)
     
     if tile_info and tile_info.get('status') == 'completed':
-        # Auto-update dataset status
+        # Auto-update dataset status and tile URLs if not already done
         if dataset.processing_status == "processing":
             dataset.processing_status = "ready"
             dataset.updated_at = datetime.now()
+            
+            # Ensure tile URLs are updated
+            if hasattr(dataset, 'image_url') and dataset.image_url:
+                try:
+                    from app.services import tile_processor as tp_module
+                    tp = tp_module.tile_processor
+                    tile_url_template = tp.get_tile_url_template(
+                        dataset.image_url,
+                        base_url="http://localhost:8000"
+                    )
+                    thumbnail_url = f"http://localhost:8000/tiles/{tile_id}/0/0/0.png"
+                    
+                    # Update variant URLs
+                    if dataset.variants:
+                        dataset.variants[0].tile_url_template = tile_url_template
+                        dataset.variants[0].thumbnail_url = thumbnail_url
+                        dataset.variants[0].max_zoom = tile_info.get('max_zoom', 8)
+                except Exception as e:
+                    logger.warning(f"Failed to update tile URLs: {e}")
         
         return {
             "dataset_id": dataset_id,
             "status": "ready",
+            "percentage": 100,
+            "message": "Dataset ready!",
             "tile_info": tile_info
         }
     
@@ -98,15 +122,21 @@ def get_dataset_status(dataset_id: str):
     if processing_status:
         return {
             "dataset_id": dataset_id,
-            "status": "processing",
+            "status": processing_status.get('status', 'processing'),
             "progress": processing_status.get('progress'),
+            "percentage": processing_status.get('percentage', 0),
+            "message": processing_status.get('message', 'Processing...'),
+            "error": processing_status.get('error'),
             "started_at": processing_status.get('started_at')
         }
     
     # Return current dataset status
+    current_status = getattr(dataset, 'processing_status', 'ready') or "ready"
     return {
         "dataset_id": dataset_id,
-        "status": getattr(dataset, 'processing_status', 'ready') or "ready"
+        "status": current_status,
+        "percentage": 100 if current_status == "ready" else 0,
+        "message": "Ready" if current_status == "ready" else "Unknown status"
     }
 
 

@@ -245,24 +245,5 @@ def initialize_catalog():
     
     # ========== GALAXY DATASETS ==========
     
-    # Andromeda Galaxy (Hubble)
-    DATASETS["andromeda_hubble"] = Dataset(
-        id="andromeda_hubble",
-        name="Andromeda Galaxy (M31)",
-        description="Hubble Space Telescope gigapixel image of Andromeda Galaxy",
-        source_id=SourceId.CUSTOM,
-        category=Category.GALAXIES,
-        subject=Subject.ANDROMEDA,
-        supports_time_series=False,
-        variants=[
-            Variant(
-                id="default",
-                name="Hubble",
-                description="High-resolution Hubble image",
-                tile_url_template="http://localhost:8000/tiles/96b343634272c2059960557f41bdd041/{z}/{x}/{y}.png",
-                thumbnail_url="http://localhost:8000/tiles/96b343634272c2059960557f41bdd041/0/0/0.png",
-                max_zoom=8,
-                is_default=True
-            )
-        ]
-    )
+    # No pre-loaded galaxy datasets
+    # Users can import their own gigapixel images using the Import feature

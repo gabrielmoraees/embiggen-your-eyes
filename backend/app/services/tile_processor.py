@@ -70,7 +70,7 @@ class TileProcessor:
         return {"status": "not_started"}
     
     def download_image(self, image_url: str, tile_id: str) -> Path:
-        """Download source image from URL"""
+        """Download source image from URL with progress tracking"""
         logger.info(f"Downloading image from {image_url}")
         
         # Determine file extension from URL
@@ -85,9 +85,21 @@ class TileProcessor:
         response = requests.get(image_url, stream=True, timeout=60)
         response.raise_for_status()
         
+        # Get total file size if available
+        total_size = int(response.headers.get('content-length', 0))
+        downloaded_size = 0
+        
         with open(local_file, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
+                downloaded_size += len(chunk)
+                
+                # Update progress (0-30% for download phase)
+                if total_size > 0 and tile_id in self.processing_status:
+                    download_percent = (downloaded_size / total_size) * 30
+                    self.processing_status[tile_id]["percentage"] = int(download_percent)
+                    self.processing_status[tile_id]["progress"] = "downloading"
+                    self.processing_status[tile_id]["message"] = f"Downloading image... {int(download_percent)}%"
         
         logger.info(f"Downloaded to {local_file}")
         return local_file
@@ -109,11 +121,13 @@ class TileProcessor:
             
             # Run gdal2tiles with raster profile (for non-georeferenced images)
             # Deep space images don't have geospatial metadata, so use raster profile
+            # Use --xyz to generate tiles in XYZ/TMS format that Leaflet expects
             cmd = [
                 gdal2tiles_cmd,
                 '--profile=raster',  # Raster profile for non-georeferenced images
-                '--zoom=0-8',  # Reasonable zoom range for web
-                '--processes=4',  # Use multiple cores
+                '--xyz',             # Generate XYZ tiles (compatible with Leaflet)
+                '--zoom=0-8',        # Reasonable zoom range for web
+                '--processes=4',     # Use multiple cores
                 '--webviewer=none',  # Don't generate viewer HTML
                 str(image_path),
                 str(output_dir)
@@ -142,32 +156,43 @@ class TileProcessor:
     
     def _find_gdal2tiles(self) -> str:
         """Find gdal2tiles command"""
-        # Try different possible locations
+        # Try different possible locations (in order of preference)
         possible_commands = [
-            'gdal2tiles.py',
-            'gdal2tiles',
-            '/usr/local/bin/gdal2tiles.py',
-            '/opt/homebrew/bin/gdal2tiles.py',
-            'python3 -m gdal2tiles'
+            '/opt/homebrew/bin/gdal2tiles.py',  # Homebrew on Apple Silicon
+            '/usr/local/bin/gdal2tiles.py',      # Homebrew on Intel Mac
+            'gdal2tiles.py',                     # In PATH
+            'gdal2tiles',                        # Alternative name
         ]
         
         for cmd in possible_commands:
             try:
+                # Test if command exists and works
+                test_cmd = f"{cmd} --help"
                 result = subprocess.run(
-                    f"{cmd} --help",
+                    test_cmd,
                     shell=True,
                     capture_output=True,
-                    timeout=5
+                    timeout=5,
+                    text=True
                 )
                 if result.returncode == 0:
+                    logger.info(f"Found gdal2tiles at: {cmd}")
                     return cmd
-            except:
+            except subprocess.TimeoutExpired:
+                logger.warning(f"Timeout checking: {cmd}")
+                continue
+            except Exception as e:
+                logger.debug(f"Failed to check {cmd}: {e}")
                 continue
         
-        raise RuntimeError(
-            "gdal2tiles.py not found. Please install GDAL: "
-            "pip install gdal or brew install gdal"
+        # If we get here, GDAL wasn't found
+        error_msg = (
+            "gdal2tiles.py not found. Please install GDAL:\n"
+            "  brew install gdal\n"
+            f"Tried locations: {', '.join(possible_commands)}"
         )
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
     
     def _get_max_zoom(self, tiles_dir: Path) -> int:
         """Determine maximum zoom level from generated tiles"""
@@ -212,22 +237,41 @@ class TileProcessor:
         tile_id = self._generate_tile_id(image_url)
         
         try:
-            # Update processing status
+            # Update processing status - initial state
             self.processing_status[tile_id] = {
                 "status": "processing",
                 "started_at": datetime.now().isoformat(),
-                "progress": "downloading"
+                "progress": "queued",
+                "percentage": 0,
+                "message": "Queued for processing..."
             }
             
-            # Step 1: Download image
+            # Step 1: Download image (0-30%)
+            self.processing_status[tile_id].update({
+                "progress": "downloading",
+                "percentage": 0,
+                "message": "Starting download..."
+            })
+            
             image_path = self.download_image(image_url, tile_id)
             
-            self.processing_status[tile_id]["progress"] = "generating_tiles"
+            # Step 2: Generate tiles (30-100%)
+            self.processing_status[tile_id].update({
+                "progress": "generating_tiles",
+                "percentage": 30,
+                "message": "Generating tiles... This may take a few minutes."
+            })
             
-            # Step 2: Generate tiles
             tiles_dir, max_zoom = self.generate_tiles(image_path, tile_id)
             
-            # Step 3: Update index
+            # Step 3: Finalizing (95%)
+            self.processing_status[tile_id].update({
+                "progress": "finalizing",
+                "percentage": 95,
+                "message": "Finalizing..."
+            })
+            
+            # Step 4: Update index
             tile_info = {
                 "tile_id": tile_id,
                 "source_url": image_url,
@@ -241,7 +285,16 @@ class TileProcessor:
             self.tile_index[tile_id] = tile_info
             self._save_tile_index()
             
-            # Clear processing status
+            # Mark as complete (100%)
+            self.processing_status[tile_id].update({
+                "progress": "completed",
+                "percentage": 100,
+                "message": "Processing complete!"
+            })
+            
+            # Clear processing status after a short delay
+            import time
+            time.sleep(2)
             if tile_id in self.processing_status:
                 del self.processing_status[tile_id]
             
@@ -255,7 +308,10 @@ class TileProcessor:
             logger.error(f"Processing failed for {tile_id}: {e}")
             self.processing_status[tile_id] = {
                 "status": "failed",
+                "progress": "failed",
+                "percentage": 0,
                 "error": str(e),
+                "message": f"Processing failed: {str(e)}",
                 "failed_at": datetime.now().isoformat()
             }
             
