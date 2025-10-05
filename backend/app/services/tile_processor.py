@@ -1,6 +1,6 @@
 """
-Tile Processor for NASA Gigapixel Images
-Converts large images to tile pyramids on-demand
+Tile Processor
+Converts large images to tile pyramids on-demand using GDAL
 """
 import os
 import requests
@@ -22,7 +22,7 @@ TILES_BASE_DIR.mkdir(exist_ok=True)
 DOWNLOADS_DIR.mkdir(exist_ok=True)
 
 class TileProcessor:
-    """Handles on-demand tile generation from NASA gigapixel images"""
+    """Handles on-demand tile generation from gigapixel images"""
     
     def __init__(self):
         self.tiles_dir = TILES_BASE_DIR
@@ -69,7 +69,7 @@ class TileProcessor:
         return {"status": "not_started"}
     
     def download_image(self, image_url: str, tile_id: str) -> Path:
-        """Download source image from NASA"""
+        """Download source image from URL"""
         logger.info(f"Downloading image from {image_url}")
         
         # Determine file extension from URL

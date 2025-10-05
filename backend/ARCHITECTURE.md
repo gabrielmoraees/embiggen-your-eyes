@@ -8,55 +8,28 @@ This project follows a feature-based clean architecture pattern for better maint
 backend/
 ├── app/                          # Application package
 │   ├── core/                     # Core application setup
-│   │   ├── app.py               # FastAPI app factory
-│   │   └── config.py            # Application configuration
-│   │
-│   ├── models/                   # Data models
-│   │   ├── enums.py             # Enumeration types
-│   │   └── schemas.py           # Pydantic models
-│   │
-│   ├── data/                     # Data layer
-│   │   ├── storage.py           # In-memory storage
-│   │   └── catalog.py           # Dataset catalog initialization
-│   │
+│   ├── models/                   # Data models (enums, schemas)
+│   ├── data/                     # Data layer (storage, catalog)
 │   ├── services/                 # Business logic layer
-│   │   ├── catalog_service.py   # Catalog operations
-│   │   ├── variant_service.py   # Variant URL resolution
-│   │   ├── view_service.py      # View management
-│   │   ├── annotation_service.py # Annotation management
-│   │   └── collection_service.py # Collection management
-│   │
-│   └── api/                      # API layer
-│       └── routes/               # Route handlers
-│           ├── catalog.py        # Catalog endpoints
-│           ├── views.py          # View endpoints
-│           ├── annotations.py    # Annotation endpoints
-│           └── collections.py    # Collection endpoints
+│   └── api/routes/               # API endpoints
 │
 ├── main.py                       # Application entry point
-├── tests/                        # Test suite
-└── tile_processor.py             # Tile processing utilities
+└── tests/                        # Test suite
 ```
 
 ## Architecture Layers
 
 ### 1. Core Layer (`app/core/`)
 - **Purpose**: Application initialization and configuration
-- **Components**:
-  - `app.py`: FastAPI application factory
-  - `config.py`: Centralized configuration settings
+- **Contains**: FastAPI app factory, configuration settings
 
 ### 2. Models Layer (`app/models/`)
 - **Purpose**: Data structures and validation
-- **Components**:
-  - `enums.py`: Type-safe enumerations (Category, Subject, SourceId, etc.)
-  - `schemas.py`: Pydantic models for validation and serialization
+- **Contains**: Enumerations, Pydantic schemas
 
 ### 3. Data Layer (`app/data/`)
 - **Purpose**: Data access and storage
-- **Components**:
-  - `storage.py`: In-memory data stores (would be DB in production)
-  - `catalog.py`: Dataset catalog initialization
+- **Contains**: In-memory storage, catalog initialization
 
 ### 4. Services Layer (`app/services/`)
 - **Purpose**: Business logic and orchestration
@@ -64,12 +37,6 @@ backend/
   - Data validation
   - Business rules enforcement
   - Coordination between data and API layers
-- **Components**:
-  - `catalog_service.py`: Dataset and source operations
-  - `variant_service.py`: Variant URL resolution logic
-  - `view_service.py`: View CRUD operations
-  - `annotation_service.py`: Annotation management
-  - `collection_service.py`: Collection management
 
 ### 5. API Layer (`app/api/routes/`)
 - **Purpose**: HTTP request/response handling
@@ -78,11 +45,6 @@ backend/
   - Response formatting
   - HTTP status codes
   - Error handling
-- **Components**:
-  - `catalog.py`: Dataset discovery endpoints
-  - `views.py`: User-saved view endpoints
-  - `annotations.py`: Annotation endpoints
-  - `collections.py`: Collection endpoints
 
 ## Design Principles
 
@@ -102,7 +64,7 @@ API → Services → Data
 ```
 
 ### 3. Feature-Based Organization
-Code is organized by feature (catalog, views, annotations) rather than by technical layer, making it easier to:
+Code is organized by feature rather than by technical layer, making it easier to:
 - Locate related code
 - Understand feature scope
 - Modify features independently
@@ -125,11 +87,12 @@ Code is organized by feature (catalog, views, annotations) rather than by techni
 
 ## Future Enhancements
 
-- Replace in-memory storage with database (PostgreSQL/MongoDB)
-- Add caching layer (Redis)
-- Implement authentication/authorization
-- Add background task processing
-- Implement event-driven architecture
-- Add API versioning
-- Implement rate limiting
-- Add comprehensive logging and monitoring
+Potential improvements include:
+- Database integration for persistent storage
+- Caching layer for improved performance
+- Authentication and authorization
+- Background task processing
+- Event-driven architecture
+- API versioning strategy
+- Rate limiting and throttling
+- Enhanced logging and monitoring

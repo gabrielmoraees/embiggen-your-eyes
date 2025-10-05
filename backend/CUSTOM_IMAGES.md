@@ -107,7 +107,7 @@ The system uses **GDAL** to convert large images into a tile pyramid:
 {
   "status": "processing",
   "progress": "generating_tiles",
-  "started_at": "2025-10-05T12:00:00"
+  "started_at": "2024-01-01T12:00:00"
 }
 ```
 
@@ -118,7 +118,7 @@ The system uses **GDAL** to convert large images into a tile pyramid:
   "tile_info": {
     "tile_id": "abc123",
     "max_zoom": 8,
-    "created_at": "2025-10-05T12:05:00"
+    "created_at": "2024-01-01T12:05:00"
   }
 }
 ```
@@ -320,29 +320,19 @@ document.getElementById('custom-image-form').addEventListener('submit', async (e
 
 ```
 backend/
-├── main.py                              # Application entry point
 ├── app/
-│   ├── core/
-│   │   └── app.py                       # FastAPI app factory
-│   ├── services/
-│   │   ├── custom_image_service.py      # Custom image business logic
-│   │   └── tile_processor.py            # Tile processing logic
-│   ├── api/
-│   │   └── routes/
-│   │       └── custom_images.py         # Custom image API endpoints
-│   └── models/
-│       └── schemas.py                   # Data models
+│   ├── services/                        # Custom image & tile processing logic
+│   ├── api/routes/                      # Custom image API endpoints
+│   └── models/                          # Data schemas
+│
 ├── tiles_cache/                         # Generated tiles (served statically)
 │   ├── {tile_id}/                       # One directory per image
-│   │   ├── 0/                           # Zoom level 0
-│   │   │   └── 0/
-│   │   │       └── 0.png
-│   │   ├── 1/                           # Zoom level 1
-│   │   └── ...
-│   └── tile_index.json                  # Index of all processed tiles
+│   │   ├── 0/, 1/, 2/, ...             # Zoom levels
+│   │   │   └── {x}/{y}.png             # Tile images
+│   │   └── tile_index.json             # Tile metadata
 │
 └── downloads/                           # Downloaded source images
-    └── {tile_id}.jpg                    # Original images (cached)
+    └── {tile_id}.{ext}                  # Original images (cached)
 ```
 
 ### Disk Space

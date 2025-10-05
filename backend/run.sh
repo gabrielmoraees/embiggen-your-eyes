@@ -6,7 +6,7 @@ echo "🚀 Starting Embiggen Your Eyes Backend..."
 
 # Check if Python is installed
 if ! command -v python3 &> /dev/null; then
-    echo "❌ Python3 is not installed. Please install Python 3.9 or higher."
+    echo "❌ Python3 is not installed. Please install Python 3.9+."
     exit 1
 fi
 

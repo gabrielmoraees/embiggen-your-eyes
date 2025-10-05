@@ -7,23 +7,9 @@ Comprehensive test suite organized by architecture layer and feature, following 
 ```
 tests/
 ├── conftest.py                      # Pytest fixtures and configuration
-│
-├── unit/                            # Unit tests
-│   ├── models/                      # Model layer tests
-│   │   ├── test_enums.py           # Enumeration tests
-│   │   └── test_schemas.py         # Pydantic schema tests
-│   └── services/                    # Service layer tests
-│       └── (future service tests)
-│
-├── integration/                     # Integration tests
-│   └── api/                         # API endpoint tests
-│       ├── test_catalog.py         # Catalog endpoints
-│       ├── test_views.py           # View endpoints
-│       ├── test_annotations.py     # Annotation endpoints
-│       └── test_collections.py     # Collection endpoints
-│
-└── e2e/                            # End-to-end tests
-    └── test_workflows.py           # Complete user workflows
+├── unit/                            # Unit tests (models, services)
+├── integration/                     # Integration tests (API endpoints)
+└── e2e/                             # End-to-end tests (user workflows)
 ```
 
 ## Test Categories
@@ -33,28 +19,18 @@ tests/
 - **Speed**: Fast execution
 - **Dependencies**: No external dependencies
 - **Organization**: Mirrors the `app/` structure
-  - `models/`: Test enums and Pydantic schemas
-  - `services/`: Test business logic (future)
 
 ### Integration Tests (`tests/integration/`)
 - **Purpose**: Test API endpoints with test client
 - **Speed**: Medium execution
 - **Dependencies**: Test client, in-memory storage
 - **Organization**: By feature/domain
-  - `api/test_catalog.py`: Dataset discovery, sources, categories
-  - `api/test_views.py`: User-saved view management
-  - `api/test_annotations.py`: Annotation CRUD
-  - `api/test_collections.py`: Collection management
 
 ### End-to-End Tests (`tests/e2e/`)
 - **Purpose**: Test complete user workflows
 - **Speed**: Slower execution
 - **Dependencies**: Full application stack
 - **Organization**: By user journey
-  - Map discovery workflows
-  - View management workflows
-  - Annotation workflows
-  - Complete user journeys
 
 ## Running Tests
 
@@ -77,19 +53,14 @@ pytest tests/e2e/
 
 ### Run by Feature
 ```bash
-# Catalog tests
+# Specific feature
 pytest tests/integration/api/test_catalog.py
 
-# View tests
-pytest tests/integration/api/test_views.py
-
-# Custom image tests
+# Specific service
 pytest tests/unit/services/test_custom_image_service.py
-pytest tests/integration/api/test_custom_images.py
-pytest tests/e2e/test_workflows.py::TestCustomImageUploadWorkflow
 
-# Model tests
-pytest tests/unit/models/
+# Specific test class
+pytest tests/e2e/test_workflows.py::TestCustomImageUploadWorkflow
 ```
 
 ### Run with Coverage
@@ -119,13 +90,7 @@ pytest -x
 
 ## Test Fixtures
 
-Common fixtures are defined in `conftest.py`:
-
-- `client`: FastAPI test client with clean database
-- `sample_annotation_data`: Sample annotation for testing
-- `sample_link_data`: Sample image link for testing
-- `sample_collection_data`: Sample collection for testing
-- `sample_map_view_data`: Sample map view for testing
+Common fixtures are defined in `conftest.py` for reusable test data and setup.
 
 ## Writing New Tests
 
