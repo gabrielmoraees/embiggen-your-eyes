@@ -73,9 +73,9 @@ gcloud run deploy "$BACKEND_SERVICE" \
     --platform managed \
     --region "$REGION" \
     --allow-unauthenticated \
-    --memory 2Gi \
-    --cpu 2 \
-    --timeout 300 \
+    --memory 8Gi \
+    --cpu 4 \
+    --timeout 600 \
     --max-instances 10 \
     --set-env-vars "TILES_BUCKET=gs://${BUCKET_NAME}" \
     --quiet
