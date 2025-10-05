@@ -120,14 +120,15 @@
                 <!-- Overlay Panel -->
                 <div class="content-panel" id="panel-overlay">
                     <h3 class="panel-title">Layer Overlay</h3>
-                    <p class="panel-desc">Add multiple layers from the same celestial body</p>
+                    <p class="panel-desc">Stack multiple datasets with custom ordering and opacity</p>
                     <div id="overlay-layers" class="overlay-layers">
                         <!-- Base layer -->
                         <div class="overlay-item base-layer">
+                            <span class="material-icons-round drag-handle">drag_indicator</span>
                             <span class="material-icons-round">layers</span>
                             <div class="overlay-info">
                                 <div class="overlay-name">Base Layer</div>
-                                <div class="overlay-desc" id="base-layer-name">Select a layer</div>
+                                <div class="overlay-desc" id="base-layer-name">Select a dataset first</div>
                             </div>
                         </div>
                     </div>
@@ -311,6 +312,65 @@
     <div class="suggestions-popover glass hidden" id="suggestions-popover">
         <h4 class="popover-title">Smart Suggestions</h4>
         <div id="suggestions-list" class="suggestions-list"></div>
+    </div>
+    
+    <!-- Modal Backdrop -->
+    <div class="modal-backdrop hidden" id="modal-backdrop"></div>
+    
+    <!-- Dataset Selector Modal (at page level for proper z-index stacking) -->
+    <div class="overlay-dataset-modal hidden" id="overlay-dataset-modal">
+        <div class="modal-header">
+            <h4 class="modal-title">Add Overlay Layer</h4>
+            <button class="icon-btn" id="btn-close-overlay-modal">
+                <span class="material-icons-round">close</span>
+            </button>
+        </div>
+        <div class="modal-content">
+            <p class="modal-subtitle">Choose any dataset from the catalog to overlay on the map</p>
+            <div class="modal-filters">
+                <select class="glass-select" id="overlay-category-filter">
+                    <option value="">All Categories</option>
+                </select>
+                <select class="glass-select" id="overlay-subject-filter">
+                    <option value="">All Subjects</option>
+                </select>
+            </div>
+            <div id="overlay-datasets-list" class="overlay-datasets-list"></div>
+            
+            <!-- Dataset Configuration (shown when dataset is selected) -->
+            <div class="overlay-dataset-config hidden" id="overlay-dataset-config">
+                <div class="config-header">
+                    <h4 class="config-title" id="config-dataset-name"></h4>
+                    <button class="icon-btn" id="btn-back-to-list" title="Back to list">
+                        <span class="material-icons-round">arrow_back</span>
+                    </button>
+                </div>
+                
+                <!-- Variant Selector -->
+                <div class="config-section" id="config-variant-section">
+                    <label class="input-label">Visualization</label>
+                    <div id="config-variant-selector" class="variant-grid"></div>
+                </div>
+                
+                <!-- Date Picker -->
+                <div class="config-section hidden" id="config-date-section">
+                    <label class="input-label">
+                        <span class="material-icons-round" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">event</span>
+                        Date
+                        <span class="date-range-info" id="config-date-range-info"></span>
+                    </label>
+                    <div class="date-input-wrapper">
+                        <span class="material-icons-round date-icon">calendar_today</span>
+                        <input type="date" id="config-date-picker" class="glass-input date-input" />
+                    </div>
+                </div>
+                
+                <button class="glass-button primary" id="btn-add-configured-overlay">
+                    <span class="material-icons-round">add</span>
+                    Add Overlay Layer
+                </button>
+            </div>
+        </div>
     </div>
     
     <!-- Leaflet JS -->

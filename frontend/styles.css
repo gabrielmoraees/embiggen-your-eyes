@@ -437,6 +437,7 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    min-height: 0;  /* Allow flex item to shrink below content size */
 }
 
 /* Sheet Tabs */
@@ -450,7 +451,8 @@ body {
     overflow-x: auto;
     scrollbar-width: none;
     position: relative;
-    height: 64px;
+    min-height: 64px;  /* Changed from fixed height to min-height */
+    flex-shrink: 0;    /* Prevent tabs from shrinking */
 }
 
 .sheet-tabs::-webkit-scrollbar {
@@ -522,6 +524,7 @@ body {
     flex: 1;
     overflow-y: auto;
     padding: var(--spacing-lg);
+    min-height: 0;  /* Allow flex item to shrink below content size */
 }
 
 .sheet-main::-webkit-scrollbar {
@@ -1014,9 +1017,38 @@ body {
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+    transition: all var(--transition-fast);
+    position: relative;
 }
 
-.overlay-item .material-icons-round {
+.overlay-item.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+}
+
+.overlay-item.drag-over {
+    border-color: var(--ios-blue);
+    background: rgba(12, 140, 233, 0.1);
+}
+
+.overlay-item .drag-handle {
+    font-size: 20px;
+    color: var(--sys-fg-tertiary);
+    cursor: grab;
+    margin-left: -4px;
+}
+
+.overlay-item .drag-handle:active {
+    cursor: grabbing;
+}
+
+.overlay-item.base-layer .drag-handle {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.overlay-item .material-icons-round:not(.drag-handle) {
     font-size: 24px;
     color: var(--ios-blue);
 }
@@ -1036,6 +1068,284 @@ body {
 .overlay-desc {
     font-size: 15px;
     font-weight: 600;
+}
+
+.overlay-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.opacity-control {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.opacity-slider {
+    width: 80px;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    outline: none;
+}
+
+.opacity-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--ios-blue);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.opacity-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.opacity-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--ios-blue);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.opacity-slider::-moz-range-thumb:hover {
+    transform: scale(1.2);
+}
+
+.opacity-value {
+    font-size: 12px;
+    color: var(--sys-fg-secondary);
+    min-width: 32px;
+    text-align: right;
+}
+
+/* Overlay Dataset Modal */
+.overlay-dataset-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    background: rgba(28, 28, 30, 0.95);  /* More opaque background */
+    backdrop-filter: blur(40px) saturate(180%);  /* Increased blur effect */
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);  /* Stronger shadow */
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    opacity: 1;
+    transition: all var(--transition-standard);
+}
+
+.overlay-dataset-modal.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(0.9);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.modal-header .icon-btn {
+    background: rgba(0, 0, 0, 0.4);  /* Dark background for X button */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-header .icon-btn:hover {
+    background: rgba(0, 0, 0, 0.6);  /* Darker on hover */
+    border-color: var(--ios-blue);
+}
+
+.modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--sys-fg);
+}
+
+.modal-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-lg);
+}
+
+.modal-subtitle {
+    font-size: 14px;
+    color: var(--sys-fg-secondary);
+    margin: 0 0 var(--spacing-md) 0;
+    line-height: 1.5;
+}
+
+/* Overlay Dataset Configuration */
+.overlay-dataset-config {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.overlay-dataset-config.hidden {
+    display: none;
+}
+
+.config-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.config-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--sys-fg);
+}
+
+.config-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.config-section.hidden {
+    display: none;
+}
+
+.glass-button.primary {
+    background: var(--ios-blue);
+    border-color: var(--ios-blue);
+    color: white;
+}
+
+.glass-button.primary:hover {
+    background: var(--ios-blue-hover);
+    border-color: var(--ios-blue-hover);
+    transform: translateY(-1px);
+}
+
+.modal-filters {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.glass-select {
+    flex: 1;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    color: var(--sys-fg);
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.glass-select:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--ios-blue);
+}
+
+.glass-select:focus {
+    outline: none;
+    border-color: var(--ios-blue);
+    box-shadow: 0 0 0 3px rgba(12, 140, 233, 0.2);
+}
+
+.overlay-datasets-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.overlay-dataset-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.overlay-dataset-card:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--ios-blue);
+    transform: translateX(4px);
+}
+
+.overlay-dataset-card .material-icons-round {
+    font-size: 24px;
+    color: var(--ios-blue);
+}
+
+.overlay-dataset-info {
+    flex: 1;
+}
+
+.overlay-dataset-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--sys-fg);
+    margin-bottom: 4px;
+}
+
+.overlay-dataset-meta {
+    font-size: 12px;
+    color: var(--sys-fg-secondary);
+}
+
+/* Modal backdrop */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1999;
+    opacity: 1;
+    transition: opacity var(--transition-standard);
+}
+
+.modal-backdrop.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+@media (max-width: 768px) {
+    .overlay-dataset-modal {
+        width: 95%;
+        max-height: 90vh;
+    }
+    
+    .modal-filters {
+        flex-direction: column;
+    }
+    
+    .opacity-slider {
+        width: 60px;
+    }
 }
 
 /* ============================================

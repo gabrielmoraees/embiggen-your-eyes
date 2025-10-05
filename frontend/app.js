@@ -19,11 +19,13 @@ const AppState = {
     
     // Map layers
     baseLayer: null,
-    overlayLayers: [],
+    baseTileLayer: null,
+    overlayLayers: [], // Array of {id, dataset, variant, tileLayer, opacity, zIndex}
     
     // Catalog data
     categories: [],
-    datasets: [],
+    datasets: [],  // Currently filtered datasets for explore panel
+    allDatasets: [],  // Complete catalog of all datasets (never filtered)
     sources: [],
     
     // User data
@@ -47,7 +49,7 @@ const AppState = {
 // ============================================================================
 function getDefaultDate() {
     const date = new Date();
-    date.setDate(date.getDate() - 3);
+    date.setDate(date.getDate() - 2);  // Match backend: 2 days ago
     return date.toISOString().split('T')[0];
 }
 
@@ -453,10 +455,14 @@ async function updateBaseLayer() {
         const source = AppState.sources.find(s => s.id === AppState.currentDataset.source_id);
         const attribution = source ? source.attribution : '© NASA';
         
-        // Create new base layer
+        // Create new base layer with z-index 0
         gibsLayer = createTileLayer(variant.tile_url, variant.max_zoom || 18, attribution);
+        gibsLayer.setZIndex(0);
     gibsLayer.addTo(map);
     
+        // Store reference
+        AppState.baseTileLayer = gibsLayer;
+        
         // Update UI
         const baseLayerName = document.getElementById('base-layer-name');
         if (baseLayerName) {
@@ -465,6 +471,9 @@ async function updateBaseLayer() {
         
         // Update map attribution
         map.attributionControl.setPrefix('');
+        
+        // Re-apply overlay layer z-indices to ensure correct stacking
+        updateLayerStacking();
         
         showStatus('Map loaded', 'success');
         console.log(`Loaded: ${AppState.currentDataset.name} - ${variant.name}`);
@@ -820,43 +829,144 @@ function updateToolButtonStates() {
     }
 }
 
-async function addOverlayLayer(layer) {
-    if (!layer) return;
-    
-    const images = await searchImages(
-        layer,
-        AppState.currentDate,
-        AppState.currentDate,
-        AppState.currentCelestialBody,
-        1
-    );
-    
-    if (images.length === 0) {
-        showStatus('No overlay images found', 'warning');
-        return;
+// ============================================================================
+// Overlay Layer Management
+// ============================================================================
+
+async function addOverlayLayer(datasetId, variantId = null, date = null) {
+    try {
+        showStatus('Loading overlay...', 'info');
+        
+        // Load the dataset
+        const dataset = await loadDataset(datasetId);
+        if (!dataset) {
+            showStatus('Failed to load dataset', 'error');
+            return;
+        }
+        
+        // Load variants
+        const variants = await loadDatasetVariants(datasetId);
+        if (variants.length === 0) {
+            showStatus('No variants available', 'error');
+            return;
+        }
+        
+        // Select variant (use provided, default, or first)
+        const selectedVariant = variantId 
+            ? variants.find(v => v.id === variantId) 
+            : (variants.find(v => v.is_default) || variants[0]);
+        
+        // Load variant with tile URLs
+        const useDate = date || (dataset.supports_time_series ? AppState.currentDate : null);
+        const response = await loadVariantWithUrls(datasetId, selectedVariant.id, useDate);
+        const variant = response?.variant;
+        
+        if (!variant || !variant.tile_url) {
+            showStatus('No tile URL found', 'error');
+            return;
+        }
+        
+        // Get attribution
+        const source = AppState.sources.find(s => s.id === dataset.source_id);
+        const attribution = source ? source.attribution : '© NASA';
+        
+        // Create tile layer
+        const tileLayer = createTileLayer(variant.tile_url, variant.max_zoom || 18, attribution);
+        tileLayer.setOpacity(0.7); // Default opacity for overlays
+        
+        // Generate unique ID for this layer
+        const layerId = `overlay-${Date.now()}`;
+        
+        // Calculate z-index (base layer is 0, overlays start at 1)
+        const zIndex = AppState.overlayLayers.length + 1;
+        tileLayer.setZIndex(zIndex);
+        tileLayer.addTo(map);
+        
+        // Add to overlay layers array
+        AppState.overlayLayers.push({
+            id: layerId,
+            dataset: dataset,
+            variant: variant,
+            tileLayer: tileLayer,
+            opacity: 0.7,
+            zIndex: zIndex,
+            date: useDate
+        });
+        
+        // Update UI
+        renderOverlayLayers();
+        showStatus('Overlay added', 'success');
+        console.log(`Added overlay: ${dataset.name} - ${variant.name}`);
+        
+    } catch (error) {
+        console.error('Failed to add overlay layer:', error);
+        showStatus('Failed to add overlay', 'error');
     }
-    
-    const imageMetadata = images[0];
-    const tileLayer = createTileLayer(imageMetadata);
-    tileLayer.setOpacity(0.6);
-    tileLayer.addTo(map);
-    
-    AppState.overlayLayers.push({
-        layer: layer,
-        tileLayer: tileLayer,
-        metadata: imageMetadata
-    });
-    
-    renderOverlayLayers();
 }
 
-function removeOverlayLayer(index) {
+function removeOverlayLayer(layerId) {
+    const index = AppState.overlayLayers.findIndex(l => l.id === layerId);
+    if (index === -1) return;
+    
     const overlay = AppState.overlayLayers[index];
-    if (overlay) {
+    
+    // Remove from map
+    if (overlay.tileLayer) {
         map.removeLayer(overlay.tileLayer);
-        AppState.overlayLayers.splice(index, 1);
-        renderOverlayLayers();
     }
+    
+    // Remove from array
+    AppState.overlayLayers.splice(index, 1);
+    
+    // Update z-indices for remaining layers
+    updateLayerStacking();
+    
+    // Update UI
+    renderOverlayLayers();
+    showStatus('Overlay removed', 'success');
+}
+
+function updateLayerOpacity(layerId, opacity) {
+    const overlay = AppState.overlayLayers.find(l => l.id === layerId);
+    if (!overlay) return;
+    
+    overlay.opacity = opacity;
+    overlay.tileLayer.setOpacity(opacity);
+}
+
+function updateLayerStacking() {
+    // Ensure base layer stays at z-index 0
+    if (AppState.baseTileLayer) {
+        AppState.baseTileLayer.setZIndex(0);
+    }
+    
+    // Update z-indices for overlay layers based on their order in the array
+    AppState.overlayLayers.forEach((overlay, index) => {
+        const zIndex = index + 1;
+        overlay.zIndex = zIndex;
+        if (overlay.tileLayer) {
+            overlay.tileLayer.setZIndex(zIndex);
+        }
+    });
+}
+
+function reorderOverlayLayers(fromIndex, toIndex) {
+    if (fromIndex === toIndex) return;
+    if (fromIndex < 0 || fromIndex >= AppState.overlayLayers.length) return;
+    if (toIndex < 0 || toIndex >= AppState.overlayLayers.length) return;
+    
+    // Remove item from old position
+    const [movedItem] = AppState.overlayLayers.splice(fromIndex, 1);
+    
+    // Insert at new position
+    AppState.overlayLayers.splice(toIndex, 0, movedItem);
+    
+    // Update z-indices
+    updateLayerStacking();
+    
+    // Update UI
+    renderOverlayLayers();
+    showStatus('Layer order updated', 'success');
 }
 
 // ============================================================================
@@ -893,6 +1003,7 @@ const SUBJECT_ICONS = {
 const CATEGORY_ICONS = {
     planets: 'assets/icons/earth.svg',
     moons: 'assets/icons/moon.svg',
+    satellites: 'assets/icons/moon.svg',  // Use moon icon for satellites
     dwarf_planets: 'assets/icons/mercury.svg',
     galaxies: 'assets/icons/galaxy.svg',
     nebulae: 'assets/icons/galaxy.svg',    // Reuse galaxy, replace with nebula.svg later
@@ -1240,27 +1351,124 @@ function updateDatePickerVisibility(dataset) {
 function renderOverlayLayers() {
     const overlayLayersEl = document.getElementById('overlay-layers');
     
-    // Keep base layer, remove old overlays
-    const baseLayer = overlayLayersEl.querySelector('.base-layer');
+    // Keep base layer, clear overlay layers
+    const baseLayerEl = overlayLayersEl.querySelector('.base-layer');
     overlayLayersEl.innerHTML = '';
-    overlayLayersEl.appendChild(baseLayer);
+    if (baseLayerEl) {
+        overlayLayersEl.appendChild(baseLayerEl);
+    }
     
+    // Render overlay layers (in order from bottom to top)
     AppState.overlayLayers.forEach((overlay, index) => {
-        const layer = AppState.availableLayers.find(l => l.value === overlay.layer);
         const item = document.createElement('div');
         item.className = 'overlay-item';
+        item.dataset.layerId = overlay.id;
+        item.dataset.index = index;
+        item.draggable = true;
+        
+        const opacityPercent = Math.round(overlay.opacity * 100);
+        
         item.innerHTML = `
+            <span class="material-icons-round drag-handle">drag_indicator</span>
             <span class="material-icons-round">layers</span>
             <div class="overlay-info">
-                <div class="overlay-name">Overlay ${index + 1}</div>
-                <div class="overlay-desc">${layer ? layer.display_name : 'Unknown'}</div>
+                <div class="overlay-name">Layer ${index + 1}</div>
+                <div class="overlay-desc">${overlay.dataset.name} - ${overlay.variant.name}</div>
+            </div>
+            <div class="overlay-controls">
+                <div class="opacity-control">
+                    <input type="range" min="0" max="100" value="${opacityPercent}" 
+                           class="opacity-slider" data-layer-id="${overlay.id}">
+                    <span class="opacity-value">${opacityPercent}%</span>
+                </div>
+                <button class="icon-btn" data-layer-id="${overlay.id}" title="Remove">
+                    <span class="material-icons-round">close</span>
+                </button>
         </div>
-            <button class="icon-btn" onclick="removeOverlayLayer(${index})">
-                <span class="material-icons-round">close</span>
-            </button>
-        `;
+    `;
+        
+        // Add drag event listeners
+        const dragHandle = item.querySelector('.drag-handle');
+        dragHandle.addEventListener('mousedown', (e) => {
+            item.draggable = true;
+        });
+        
+        item.addEventListener('dragstart', handleDragStart);
+        item.addEventListener('dragover', handleDragOver);
+        item.addEventListener('drop', handleDrop);
+        item.addEventListener('dragend', handleDragEnd);
+        
+        // Add opacity slider listener
+        const opacitySlider = item.querySelector('.opacity-slider');
+        opacitySlider.addEventListener('input', (e) => {
+            const opacity = parseFloat(e.target.value) / 100;
+            updateLayerOpacity(overlay.id, opacity);
+            
+            // Update displayed value
+            const valueSpan = item.querySelector('.opacity-value');
+            valueSpan.textContent = `${e.target.value}%`;
+        });
+        
+        // Add remove button listener
+        const removeBtn = item.querySelector('.icon-btn[data-layer-id]');
+        removeBtn.addEventListener('click', () => {
+            removeOverlayLayer(overlay.id);
+        });
+        
         overlayLayersEl.appendChild(item);
     });
+}
+
+// Drag and drop handlers
+let draggedItem = null;
+
+function handleDragStart(e) {
+    draggedItem = e.currentTarget;
+    draggedItem.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+    
+    const target = e.currentTarget;
+    if (target !== draggedItem && target.classList.contains('overlay-item') && !target.classList.contains('base-layer')) {
+        target.classList.add('drag-over');
+    }
+    
+    return false;
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+    
+    const target = e.currentTarget;
+    target.classList.remove('drag-over');
+    
+    if (draggedItem !== target && !target.classList.contains('base-layer')) {
+        const fromIndex = parseInt(draggedItem.dataset.index);
+        const toIndex = parseInt(target.dataset.index);
+        
+        reorderOverlayLayers(fromIndex, toIndex);
+    }
+    
+    return false;
+}
+
+function handleDragEnd(e) {
+    e.currentTarget.classList.remove('dragging');
+    
+    // Remove drag-over class from all items
+    document.querySelectorAll('.overlay-item').forEach(item => {
+        item.classList.remove('drag-over');
+    });
+    
+    draggedItem = null;
 }
 
 function renderAnnotationsList(annotations) {
@@ -1393,6 +1601,235 @@ function renderSuggestionsList(suggestions) {
             </div>
         `;
         suggestionsList.appendChild(item);
+    });
+}
+
+// ============================================================================
+// Overlay Dataset Modal
+// ============================================================================
+
+// State for dataset configuration
+let selectedOverlayDataset = null;
+let selectedOverlayVariant = null;
+let selectedOverlayDate = null;
+
+function openOverlayDatasetModal() {
+    const modal = document.getElementById('overlay-dataset-modal');
+    const backdrop = document.getElementById('modal-backdrop');
+    
+    // Reset selection state
+    selectedOverlayDataset = null;
+    selectedOverlayVariant = null;
+    selectedOverlayDate = null;
+    
+    // Show dataset list, hide config
+    showDatasetList();
+    
+    // Populate filters
+    populateOverlayFilters();
+    
+    // Show all datasets initially (use allDatasets to show complete catalog)
+    renderOverlayDatasetsList(AppState.allDatasets);
+    
+    // Show modal and backdrop
+    backdrop.classList.remove('hidden');
+    modal.classList.remove('hidden');
+}
+
+function closeOverlayDatasetModal() {
+    const modal = document.getElementById('overlay-dataset-modal');
+    const backdrop = document.getElementById('modal-backdrop');
+    
+    modal.classList.add('hidden');
+    backdrop.classList.add('hidden');
+}
+
+function showDatasetList() {
+    document.getElementById('overlay-datasets-list').classList.remove('hidden');
+    document.querySelector('.modal-filters').classList.remove('hidden');
+    document.querySelector('.modal-subtitle').classList.remove('hidden');
+    document.getElementById('overlay-dataset-config').classList.add('hidden');
+}
+
+function showDatasetConfig() {
+    document.getElementById('overlay-datasets-list').classList.add('hidden');
+    document.querySelector('.modal-filters').classList.add('hidden');
+    document.querySelector('.modal-subtitle').classList.add('hidden');
+    document.getElementById('overlay-dataset-config').classList.remove('hidden');
+}
+
+function populateOverlayFilters() {
+    const categoryFilter = document.getElementById('overlay-category-filter');
+    const subjectFilter = document.getElementById('overlay-subject-filter');
+    
+    // Clear existing options (keep "All" option)
+    categoryFilter.innerHTML = '<option value="">All Categories</option>';
+    
+    // Populate categories from complete catalog
+    const categories = [...new Set(AppState.allDatasets.map(d => d.category))].sort();
+    categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        categoryFilter.appendChild(option);
+    });
+    
+    // Populate subjects based on current category selection
+    updateSubjectFilter();
+}
+
+function updateSubjectFilter() {
+    const categoryFilter = document.getElementById('overlay-category-filter');
+    const subjectFilter = document.getElementById('overlay-subject-filter');
+    const selectedCategory = categoryFilter.value;
+    
+    // Clear existing subjects
+    subjectFilter.innerHTML = '<option value="">All Subjects</option>';
+    
+    // Get subjects based on selected category
+    const datasetsToFilter = selectedCategory 
+        ? AppState.allDatasets.filter(d => d.category === selectedCategory)
+        : AppState.allDatasets;
+    
+    const subjects = [...new Set(datasetsToFilter.map(d => d.subject))].sort();
+    subjects.forEach(subject => {
+        const option = document.createElement('option');
+        option.value = subject;
+        option.textContent = subject.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        subjectFilter.appendChild(option);
+    });
+}
+
+function filterOverlayDatasets() {
+    const categoryFilter = document.getElementById('overlay-category-filter').value;
+    const subjectFilter = document.getElementById('overlay-subject-filter').value;
+    
+    // Always filter from complete catalog
+    let filtered = AppState.allDatasets;
+    
+    if (categoryFilter) {
+        filtered = filtered.filter(d => d.category === categoryFilter);
+    }
+    
+    if (subjectFilter) {
+        filtered = filtered.filter(d => d.subject === subjectFilter);
+    }
+    
+    renderOverlayDatasetsList(filtered);
+}
+
+function renderOverlayDatasetsList(datasets) {
+    const listEl = document.getElementById('overlay-datasets-list');
+    listEl.innerHTML = '';
+    
+    if (datasets.length === 0) {
+        listEl.innerHTML = '<div class="panel-desc">No datasets found</div>';
+        return;
+    }
+    
+    datasets.forEach(dataset => {
+        const card = document.createElement('div');
+        card.className = 'overlay-dataset-card';
+        
+        const badges = [];
+        if (dataset.supports_time_series) {
+            badges.push('<span class="layer-badge"><span class="material-icons-round" style="font-size: 14px;">schedule</span>Time</span>');
+        }
+        if (dataset.variants && dataset.variants.length > 1) {
+            badges.push(`<span class="layer-badge">${dataset.variants.length} variants</span>`);
+        }
+        
+        card.innerHTML = `
+            <span class="material-icons-round">terrain</span>
+            <div class="overlay-dataset-info">
+                <div class="overlay-dataset-name">
+                    ${dataset.name}
+                    ${badges.join(' ')}
+                </div>
+                <div class="overlay-dataset-meta">
+                    ${dataset.category.replace('_', ' ')} › ${dataset.subject.replace('_', ' ')}
+                </div>
+            </div>
+        `;
+        
+        card.addEventListener('click', async () => {
+            // Show configuration screen for this dataset
+            await showDatasetConfiguration(dataset);
+        });
+        
+        listEl.appendChild(card);
+    });
+}
+
+async function showDatasetConfiguration(dataset) {
+    selectedOverlayDataset = dataset;
+    
+    // Update title
+    document.getElementById('config-dataset-name').textContent = dataset.name;
+    
+    // Load and show variants
+    const variants = await loadDatasetVariants(dataset.id);
+    renderConfigVariants(variants);
+    
+    // Show/hide date picker based on time-series support
+    if (dataset.supports_time_series) {
+        const dateSection = document.getElementById('config-date-section');
+        const datePicker = document.getElementById('config-date-picker');
+        const dateRangeInfo = document.getElementById('config-date-range-info');
+        
+        dateSection.classList.remove('hidden');
+        
+        // Set date range
+        if (dataset.date_range_start && dataset.date_range_end) {
+            const start = new Date(dataset.date_range_start).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+            const end = new Date(dataset.date_range_end).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+            dateRangeInfo.textContent = `(${start} - ${end})`;
+            datePicker.min = dataset.date_range_start;
+            datePicker.max = dataset.date_range_end;
+        }
+        
+        // Set default date
+        const defaultDate = dataset.default_date || AppState.currentDate;
+        datePicker.value = defaultDate;
+        selectedOverlayDate = defaultDate;
+    } else {
+        document.getElementById('config-date-section').classList.add('hidden');
+        selectedOverlayDate = null;
+    }
+    
+    // Switch to config view
+    showDatasetConfig();
+}
+
+function renderConfigVariants(variants) {
+    const container = document.getElementById('config-variant-selector');
+    container.innerHTML = '';
+    
+    if (!variants || variants.length === 0) return;
+    
+    // Auto-select default or first variant
+    selectedOverlayVariant = variants.find(v => v.is_default) || variants[0];
+    
+    variants.forEach(variant => {
+        const card = document.createElement('div');
+        card.className = 'variant-card';
+        if (variant.id === selectedOverlayVariant.id) {
+            card.classList.add('active');
+        }
+        
+        card.innerHTML = `
+            <div class="variant-name">${variant.name}</div>
+            <div class="variant-desc">${variant.description}</div>
+        `;
+        
+        card.addEventListener('click', () => {
+            selectedOverlayVariant = variant;
+            // Update active state
+            container.querySelectorAll('.variant-card').forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+        });
+        
+        container.appendChild(card);
     });
 }
 
@@ -1531,11 +1968,63 @@ function initializeEventListeners() {
     
     // Add overlay layer button
     document.getElementById('btn-add-overlay').addEventListener('click', () => {
-        // Show layer selector
-        const layerValue = prompt('Enter layer ID to overlay:');
-        if (layerValue) {
-            addOverlayLayer(layerValue);
+        openOverlayDatasetModal();
+    });
+    
+    // Close overlay modal button
+    document.getElementById('btn-close-overlay-modal').addEventListener('click', () => {
+        closeOverlayDatasetModal();
+    });
+    
+    // Modal backdrop click - only close if clicking the backdrop, not the modal
+    const modalBackdrop = document.getElementById('modal-backdrop');
+    const overlayModal = document.getElementById('overlay-dataset-modal');
+    
+    modalBackdrop.addEventListener('click', (e) => {
+        closeOverlayDatasetModal();
+    });
+    
+    // Prevent clicks inside modal from closing it
+    overlayModal.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+    
+    // Overlay filters
+    document.getElementById('overlay-category-filter').addEventListener('change', (e) => {
+        updateSubjectFilter();  // Update subjects when category changes
+        filterOverlayDatasets();
+    });
+    
+    document.getElementById('overlay-subject-filter').addEventListener('change', (e) => {
+        filterOverlayDatasets();
+    });
+    
+    // Back to list button
+    document.getElementById('btn-back-to-list').addEventListener('click', () => {
+        showDatasetList();
+    });
+    
+    // Add configured overlay button
+    document.getElementById('btn-add-configured-overlay').addEventListener('click', async () => {
+        if (!selectedOverlayDataset || !selectedOverlayVariant) {
+            showStatus('Please select a variant', 'warning');
+            return;
         }
+        
+        // Get date if applicable
+        const datePicker = document.getElementById('config-date-picker');
+        const date = selectedOverlayDataset.supports_time_series ? datePicker.value : null;
+        
+        // Close modal
+        closeOverlayDatasetModal();
+        
+        // Add the overlay layer with configuration
+        await addOverlayLayer(selectedOverlayDataset.id, selectedOverlayVariant.id, date);
+    });
+    
+    // Date picker change handler
+    document.getElementById('config-date-picker').addEventListener('change', (e) => {
+        selectedOverlayDate = e.target.value;
     });
     
     // New collection button
@@ -1668,7 +2157,7 @@ function openBottomSheet(panelId) {
     floatingButtons.classList.add('hidden');
     
     // Show bottom sheet after a short delay
-    setTimeout(() => {
+setTimeout(() => {
         controlSheet.classList.remove('hidden');
         controlSheet.classList.remove('collapsed');
         
@@ -1780,6 +2269,7 @@ async function initializeApp() {
     console.log('📊 Loading all datasets...');
     const allDatasets = await loadDatasets();
     AppState.datasets = allDatasets;
+    AppState.allDatasets = allDatasets;  // Store complete catalog separately
     console.log(`Datasets loaded: ${allDatasets.length} total`);
     
     // Render categories with subjects
