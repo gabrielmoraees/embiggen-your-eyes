@@ -9,8 +9,8 @@
 
 :root {
     /* iOS 26 Color System */
-    --ios-blue: #007AFF;
-    --ios-blue-hover: #0051D5;
+    --ios-blue: #0C8CE9;
+    --ios-blue-hover: #0A75C7;
     --ios-green: #34C759;
     --ios-indigo: #5856D6;
     --ios-orange: #FF9500;
@@ -122,6 +122,10 @@ body {
     gap: var(--spacing-sm);
 }
 
+.mobile-only {
+    display: none !important;
+}
+
 .status-pill {
     display: flex;
     align-items: center;
@@ -178,6 +182,60 @@ body {
 }
 
 /* Dataset Dropdown Menu */
+.mobile-menu-dropdown {
+    position: fixed;
+    top: 80px;
+    right: var(--spacing-md);
+    width: 250px;
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-md);
+    z-index: 999;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    transition: all var(--transition-normal);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.mobile-menu-dropdown:not(.hidden) {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: all;
+}
+
+.mobile-menu-dropdown .icon-btn {
+    width: 100%;
+    justify-content: flex-start;
+    gap: var(--spacing-md);
+    min-height: 48px;
+    padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.mobile-menu-dropdown .icon-btn .material-icons-round {
+    margin-left: var(--spacing-xs);
+}
+
+.mobile-menu-dropdown .status-pill {
+    min-height: 48px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    justify-content: flex-start;
+    width: 100%;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+}
+
+.mobile-menu-dropdown .status-pill .status-dot {
+    margin-left: var(--spacing-xs);
+}
+
+.mobile-menu-label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
 .dataset-dropdown {
     position: fixed;
     top: 80px;
@@ -267,6 +325,65 @@ body {
 }
 
 /* ============================================
+   Floating Action Buttons
+   ============================================ */
+.floating-buttons {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: var(--spacing-md);
+    z-index: 1000;
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: all;
+}
+
+.floating-buttons.hidden {
+    opacity: 0;
+    transform: translateX(-50%) translateY(120px) scale(0.8);
+    pointer-events: none;
+}
+
+.floating-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    color: var(--sys-fg);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    min-width: 80px;
+}
+
+.floating-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+}
+
+.floating-btn:active {
+    transform: translateY(-2px) scale(1.02);
+}
+
+.floating-btn .material-icons-round {
+    font-size: 28px;
+}
+
+.floating-btn-label {
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+}
+
+/* ============================================
    Bottom Sheet - iOS Style
    ============================================ */
 .bottom-sheet {
@@ -276,7 +393,7 @@ body {
     right: 0;
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     z-index: 900;
-    transition: transform var(--transition-slow);
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     max-height: 80vh;
     display: flex;
     flex-direction: column;
@@ -284,6 +401,11 @@ body {
     backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid var(--glass-border);
     border-bottom: none;
+}
+
+.bottom-sheet.hidden {
+    transform: translateY(100%);
+    opacity: 0;
 }
 
 .bottom-sheet.collapsed {
@@ -315,52 +437,69 @@ body {
     flex-direction: column;
 }
 
-/* Quick Actions Bar */
-.quick-actions-bar {
+/* Sheet Tabs */
+.sheet-tabs {
     display: flex;
-    gap: var(--spacing-xs);
-    padding: var(--spacing-md);
+    gap: 0;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: var(--radius-lg);
+    margin: var(--spacing-md);
     overflow-x: auto;
     scrollbar-width: none;
 }
 
-.quick-actions-bar::-webkit-scrollbar {
+.sheet-tabs::-webkit-scrollbar {
     display: none;
 }
 
-.action-btn {
-    flex: 0 0 auto;
+.sheet-tab {
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
     padding: var(--spacing-sm) var(--spacing-md);
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-md);
-    color: var(--sys-fg);
+    background: transparent;
+    border: none;
+    color: var(--sys-fg-secondary);
     cursor: pointer;
     transition: all var(--transition-fast);
-    font-size: 11px;
-    font-weight: 500;
-    width: 100px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    border-radius: var(--radius-md);
+    position: relative;
 }
 
-.action-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateY(-2px);
+.sheet-tab:hover {
+    color: var(--sys-fg);
+    background: rgba(255, 255, 255, 0.05);
 }
 
-.action-btn.active {
+.sheet-tab.active {
+    background: var(--glass-bg);
+    color: var(--ios-blue);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.sheet-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 3px;
     background: var(--ios-blue);
-    color: white;
+    border-radius: 2px;
 }
 
-.action-btn .material-icons-round {
-    font-size: 24px;
+.sheet-tab .material-icons-round {
+    font-size: 22px;
 }
 
-.action-label {
+.tab-label {
     white-space: nowrap;
 }
 
@@ -952,7 +1091,8 @@ body {
 
 .tool-btn:hover {
     background: rgba(255, 255, 255, 0.1);
-    transform: scale(1.05);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .tool-btn.active {
@@ -1149,8 +1289,69 @@ body {
         right: var(--spacing-sm);
     }
     
+    .top-bar-right {
+        flex-direction: row;
+        gap: var(--spacing-sm);
+    }
+    
+    .desktop-only {
+        display: none !important;
+    }
+    
+    .mobile-only {
+        display: flex !important;
+    }
+    
+    .dataset-btn {
+        flex: 1;
+        justify-content: center;
+    }
+    
+    .mobile-menu-dropdown {
+        right: var(--spacing-sm);
+        left: var(--spacing-sm);
+        width: auto;
+        top: 120px;
+    }
+    
+    .dataset-dropdown {
+        right: var(--spacing-sm);
+        left: var(--spacing-sm);
+        width: auto;
+        top: 80px;
+    }
+    
     .app-logo {
         height: 20px;
+    }
+    
+    .floating-buttons {
+        bottom: 80px;
+        gap: var(--spacing-xs);
+        flex-wrap: nowrap;
+        max-width: calc(100vw - 32px);
+        justify-content: center;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding: 0 var(--spacing-sm);
+    }
+    
+    .floating-buttons::-webkit-scrollbar {
+        display: none;
+    }
+    
+    .floating-btn {
+        min-width: 65px;
+        flex-shrink: 0;
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+    
+    .floating-btn .material-icons-round {
+        font-size: 22px;
+    }
+    
+    .floating-btn-label {
+        font-size: 9px;
     }
     
     .body-grid {

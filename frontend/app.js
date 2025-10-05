@@ -56,7 +56,12 @@ function showStatus(message, type = 'info') {
     const statusText = document.getElementById('status-text');
     const statusDot = statusPill.querySelector('.status-dot');
     
+    // Update both desktop and mobile status
     statusText.textContent = message;
+    const statusTextMobile = document.getElementById('status-text-mobile');
+    if (statusTextMobile) {
+        statusTextMobile.textContent = message;
+    }
     
     // Update dot color based on type
     const colors = {
@@ -67,6 +72,15 @@ function showStatus(message, type = 'info') {
     };
     
     statusDot.style.background = colors[type] || colors.info;
+    
+    // Update mobile status dot color
+    const statusPillMobile = document.getElementById('status-pill-mobile');
+    if (statusPillMobile) {
+        const statusDotMobile = statusPillMobile.querySelector('.status-dot');
+        if (statusDotMobile) {
+            statusDotMobile.style.background = colors[type] || colors.info;
+        }
+    }
 }
 
 async function apiRequest(endpoint, options = {}) {
@@ -772,11 +786,8 @@ function enterDrawingMode(mode) {
     // Update tool button states
     updateToolButtonStates();
     
-    // Collapse the bottom sheet to focus on map
-    const controlSheet = document.getElementById('control-sheet');
-    if (controlSheet && !controlSheet.classList.contains('collapsed')) {
-        controlSheet.classList.add('collapsed');
-    }
+    // Close the bottom sheet to focus on map
+    closeBottomSheet();
 }
 
 function exitDrawingMode() {
@@ -962,22 +973,16 @@ function renderCategoriesWithSubjects() {
             if (AppState.currentCategory === category && AppState.currentSubject === subject) {
                 console.log('Subject already selected, skipping reload');
                 
-                // Just collapse the bottom sheet
-                const controlSheet = document.getElementById('control-sheet');
-                if (controlSheet) {
-                    controlSheet.classList.add('collapsed');
-                }
+                // Just close the bottom sheet
+                closeBottomSheet();
                 return;
             }
             
             AppState.currentCategory = category;
             AppState.currentSubject = subject;
             
-            // Collapse bottom sheet to focus on map
-            const controlSheet = document.getElementById('control-sheet');
-            if (controlSheet) {
-                controlSheet.classList.add('collapsed');
-            }
+            // Close bottom sheet to focus on map
+            closeBottomSheet();
             
             // Load datasets for this subject
             const datasets = await loadDatasets(category, subject);
@@ -1294,11 +1299,8 @@ function renderAnnotationsList(annotations) {
         // Click to focus on annotation and center map
         item.addEventListener('click', (e) => {
             if (!e.target.closest('.icon-btn') && !e.target.classList.contains('editable') && ann._leafletLayer) {
-                // Collapse the sheet to focus on map
-                const controlSheet = document.getElementById('control-sheet');
-                if (controlSheet) {
-                    controlSheet.classList.add('collapsed');
-                }
+                // Close the sheet to focus on map
+                closeBottomSheet();
                 
                 // Center map on annotation
                 if (ann.type === 'point') {
@@ -1402,21 +1404,31 @@ function initializeEventListeners() {
     // Bottom sheet drag/tap to expand/collapse
     const sheetHandle = document.getElementById('sheet-handle');
     const controlSheet = document.getElementById('control-sheet');
+    const floatingButtons = document.getElementById('floating-buttons');
     
     sheetHandle.addEventListener('click', () => {
-        controlSheet.classList.toggle('collapsed');
+        closeBottomSheet();
     });
     
-    // Quick action buttons
-    const actionButtons = document.querySelectorAll('.action-btn');
-    actionButtons.forEach(btn => {
+    // Floating action buttons
+    const floatingBtns = document.querySelectorAll('.floating-btn');
+    floatingBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            const panelId = btn.id.replace('btn-', 'panel-');
+            const panelId = btn.id.replace('floating-btn-', 'panel-');
+            openBottomSheet(panelId);
+        });
+    });
+    
+    // Sheet tabs (inside bottom sheet)
+    const sheetTabs = document.querySelectorAll('.sheet-tab');
+    sheetTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const panelId = tab.id.replace('tab-', 'panel-');
             switchPanel(panelId);
             
             // Update active state
-            actionButtons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+            sheetTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
         });
     });
     
@@ -1471,13 +1483,6 @@ function initializeEventListeners() {
     // Map controls
     document.getElementById('btn-zoom-in').addEventListener('click', () => map.zoomIn());
     document.getElementById('btn-zoom-out').addEventListener('click', () => map.zoomOut());
-    document.getElementById('btn-locate').addEventListener('click', () => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition((position) => {
-                map.setView([position.coords.latitude, position.coords.longitude], 8);
-            });
-        }
-    });
     document.getElementById('btn-fullscreen').addEventListener('click', () => {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen();
@@ -1503,10 +1508,37 @@ function initializeEventListeners() {
         }
     });
     
-    // Suggestions button
+    // Suggestions button (desktop)
     document.getElementById('btn-suggestions').addEventListener('click', () => {
         const popover = document.getElementById('suggestions-popover');
         popover.classList.toggle('hidden');
+    });
+    
+    // Suggestions button (mobile)
+    document.getElementById('btn-suggestions-mobile').addEventListener('click', () => {
+        const popover = document.getElementById('suggestions-popover');
+        const mobileMenu = document.getElementById('mobile-menu-dropdown');
+        popover.classList.toggle('hidden');
+        mobileMenu.classList.add('hidden');
+    });
+    
+    // Search button (mobile)
+    document.getElementById('btn-search-mobile').addEventListener('click', () => {
+        const searchInput = document.getElementById('search-input');
+        const mobileMenu = document.getElementById('mobile-menu-dropdown');
+        searchInput.focus();
+        mobileMenu.classList.add('hidden');
+    });
+    
+    // Mobile menu toggle
+    document.getElementById('btn-mobile-menu').addEventListener('click', () => {
+        const mobileMenu = document.getElementById('mobile-menu-dropdown');
+        const datasetDropdown = document.getElementById('dataset-dropdown');
+        mobileMenu.classList.toggle('hidden');
+        // Close dataset dropdown if open
+        if (!datasetDropdown.classList.contains('hidden')) {
+            datasetDropdown.classList.add('hidden');
+        }
     });
     
     // Dataset dropdown button
@@ -1590,6 +1622,36 @@ function initializeEventListeners() {
     });
 }
 
+function openBottomSheet(panelId) {
+    const controlSheet = document.getElementById('control-sheet');
+    const floatingButtons = document.getElementById('floating-buttons');
+    
+    // Hide floating buttons with animation
+    floatingButtons.classList.add('hidden');
+    
+    // Show bottom sheet after a short delay
+setTimeout(() => {
+        controlSheet.classList.remove('hidden');
+        controlSheet.classList.remove('collapsed');
+    }, 100);
+    
+    // Switch to the selected panel
+    switchPanel(panelId);
+}
+
+function closeBottomSheet() {
+    const controlSheet = document.getElementById('control-sheet');
+    const floatingButtons = document.getElementById('floating-buttons');
+    
+    // Hide bottom sheet with animation
+    controlSheet.classList.add('hidden');
+    
+    // Show floating buttons after a short delay
+    setTimeout(() => {
+        floatingButtons.classList.remove('hidden');
+    }, 300);
+}
+
 function switchPanel(panelId) {
     // Hide all panels
     document.querySelectorAll('.content-panel').forEach(panel => {
@@ -1602,14 +1664,21 @@ function switchPanel(panelId) {
         selectedPanel.classList.add('active');
     }
     
+    // Update tab active states
+    const sheetTabs = document.querySelectorAll('.sheet-tab');
+    sheetTabs.forEach(tab => {
+        const tabPanelId = tab.id.replace('tab-', 'panel-');
+        if (tabPanelId === panelId) {
+            tab.classList.add('active');
+        } else {
+            tab.classList.remove('active');
+        }
+    });
+    
     // Re-render Explore panel to restore selected subject state
     if (panelId === 'panel-bodies') {
         renderCategoriesWithSubjects();
     }
-    
-    // Expand sheet if collapsed
-    const controlSheet = document.getElementById('control-sheet');
-    controlSheet.classList.remove('collapsed');
 }
 
 // Make functions globally accessible

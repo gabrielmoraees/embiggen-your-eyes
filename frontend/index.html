@@ -21,30 +21,50 @@
     <!-- Main Map Container -->
     <div id="map"></div>
     
+    <!-- Floating Action Buttons -->
+    <div id="floating-buttons" class="floating-buttons">
+        <button class="floating-btn" id="floating-btn-bodies" title="Explore Subjects">
+            <span class="material-icons-round">public</span>
+            <span class="floating-btn-label">Explore</span>
+        </button>
+        <button class="floating-btn" id="floating-btn-overlay" title="Overlay Layers">
+            <span class="material-icons-round">filter_none</span>
+            <span class="floating-btn-label">Overlay</span>
+        </button>
+        <button class="floating-btn" id="floating-btn-compare" title="Compare">
+            <span class="material-icons-round">compare</span>
+            <span class="floating-btn-label">Compare</span>
+        </button>
+        <button class="floating-btn" id="floating-btn-tools" title="Tools">
+            <span class="material-icons-round">draw</span>
+            <span class="floating-btn-label">Tools</span>
+        </button>
+    </div>
+    
     <!-- iOS-style Bottom Sheet Control Panel -->
-    <div id="control-sheet" class="bottom-sheet collapsed">
+    <div id="control-sheet" class="bottom-sheet hidden">
         <div class="sheet-handle" id="sheet-handle">
             <div class="handle-bar"></div>
         </div>
         
         <div class="sheet-content">
-            <!-- Quick Actions Bar -->
-            <div class="quick-actions-bar">
-                <button class="action-btn" id="btn-bodies" title="Explore Subjects">
+            <!-- Tab Navigation -->
+            <div class="sheet-tabs">
+                <button class="sheet-tab" id="tab-bodies" title="Explore Subjects">
                     <span class="material-icons-round">public</span>
-                    <span class="action-label">Explore</span>
+                    <span class="tab-label">Explore</span>
                 </button>
-                <button class="action-btn" id="btn-overlay" title="Overlay Layers">
+                <button class="sheet-tab" id="tab-overlay" title="Overlay Layers">
                     <span class="material-icons-round">filter_none</span>
-                    <span class="action-label">Overlay</span>
+                    <span class="tab-label">Overlay</span>
                 </button>
-                <button class="action-btn" id="btn-compare" title="Compare">
+                <button class="sheet-tab" id="tab-compare" title="Compare">
                     <span class="material-icons-round">compare</span>
-                    <span class="action-label">Compare</span>
+                    <span class="tab-label">Compare</span>
                 </button>
-                <button class="action-btn" id="btn-tools" title="Tools">
+                <button class="sheet-tab" id="tab-tools" title="Tools">
                     <span class="material-icons-round">draw</span>
-                    <span class="action-label">Tools</span>
+                    <span class="tab-label">Tools</span>
                 </button>
             </div>
             
@@ -120,6 +140,7 @@
                 <!-- Compare Panel -->
                 <div class="content-panel" id="panel-compare">
                     <h3 class="panel-title">Compare Images</h3>
+                    <div class="explore-desc">Compare different datasets side by side</div>
                     <div class="compare-modes">
                         <button class="mode-btn active" data-mode="overlay">
                             <span class="material-icons-round">filter_none</span>
@@ -150,6 +171,7 @@
                 <!-- Tools Panel -->
                 <div class="content-panel" id="panel-tools">
                     <h3 class="panel-title">Annotation Tools</h3>
+                    <div class="explore-desc">Create markers and annotations on the map</div>
                     <div class="tools-grid">
                         <button class="tool-btn" id="tool-marker">
                             <span class="material-icons-round">place</span>
@@ -168,7 +190,6 @@
                             <span>Circle</span>
                         </button>
                     </div>
-                    <div class="divider"></div>
                     <div id="annotations-list" class="annotations-list"></div>
                 </div>
             </div>
@@ -181,21 +202,45 @@
             <img src="assets/logo.svg" alt="Embiggen Your Eyes" class="app-logo" />
         </div>
         <div class="top-bar-right">
-            <div class="status-pill" id="status-pill">
+            <!-- Desktop items - hidden on mobile -->
+            <div class="status-pill desktop-only" id="status-pill">
                 <div class="status-dot"></div>
                 <span id="status-text">Ready</span>
             </div>
-            <button class="icon-btn glass" id="btn-suggestions" title="Smart Suggestions">
+            <button class="icon-btn glass desktop-only" id="btn-suggestions" title="Smart Suggestions">
                 <span class="material-icons-round">auto_awesome</span>
             </button>
-            <button class="icon-btn glass" id="btn-search" title="Search">
+            <button class="icon-btn glass desktop-only" id="btn-search" title="Search">
                 <span class="material-icons-round">search</span>
             </button>
+            
+            <!-- Dataset button - Always visible, last on desktop, first on mobile -->
             <button class="dataset-btn glass" id="btn-dataset-dropdown" title="Dataset">
                 <span class="material-icons-round">layers</span>
                 <span class="dataset-btn-label" id="dataset-btn-label">Dataset</span>
                 <span class="material-icons-round">expand_more</span>
             </button>
+            
+            <!-- Mobile burger menu - only visible on mobile -->
+            <button class="icon-btn glass mobile-only" id="btn-mobile-menu" title="Menu">
+                <span class="material-icons-round">menu</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Mobile Menu Dropdown -->
+    <div class="mobile-menu-dropdown glass hidden" id="mobile-menu-dropdown">
+        <button class="icon-btn glass" id="btn-suggestions-mobile" title="Smart Suggestions">
+            <span class="material-icons-round">auto_awesome</span>
+            <span class="mobile-menu-label">Smart Suggestions</span>
+        </button>
+        <button class="icon-btn glass" id="btn-search-mobile" title="Search">
+            <span class="material-icons-round">search</span>
+            <span class="mobile-menu-label">Search</span>
+        </button>
+        <div class="status-pill" id="status-pill-mobile">
+            <div class="status-dot"></div>
+            <span id="status-text-mobile">Ready</span>
         </div>
     </div>
     
@@ -244,9 +289,6 @@
         </button>
         <button class="map-btn glass" id="btn-zoom-out" title="Zoom Out">
             <span class="material-icons-round">remove</span>
-        </button>
-        <button class="map-btn glass" id="btn-locate" title="My Location">
-            <span class="material-icons-round">my_location</span>
         </button>
         <button class="map-btn glass" id="btn-fullscreen" title="Fullscreen">
             <span class="material-icons-round">fullscreen</span>
