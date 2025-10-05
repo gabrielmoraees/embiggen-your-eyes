@@ -6,7 +6,7 @@ from typing import Optional
 from datetime import date, datetime
 
 from app.models.enums import Category, Subject, SourceId
-from app.models.schemas import DatasetCreateRequest, DatasetUpdateRequest
+from app.models.schemas import DatasetCreateRequest, DatasetUpdateRequest, Dataset
 from app.services.catalog_service import CatalogService
 from app.services.variant_service import VariantService
 from app.services.dataset_service import DatasetService
@@ -45,7 +45,7 @@ def get_datasets(
     return CatalogService.get_datasets(category, subject, source_id, supports_time_series)
 
 
-@router.get("/{dataset_id}")
+@router.get("/{dataset_id}", response_model=Dataset)
 def get_dataset(dataset_id: str):
     """Get details for a specific dataset"""
     dataset = CatalogService.get_dataset(dataset_id)

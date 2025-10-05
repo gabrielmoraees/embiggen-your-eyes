@@ -1,7 +1,7 @@
 """
 Data catalog initialization with all available datasets
 """
-from datetime import date
+from datetime import date, timedelta
 from app.models.enums import Category, Subject, SourceId
 from app.models.schemas import Source, Dataset, Variant
 from .storage import SOURCES, DATASETS
@@ -9,6 +9,9 @@ from .storage import SOURCES, DATASETS
 
 def initialize_catalog():
     """Initialize the catalog with all available datasets, sources, and layers"""
+    
+    # Calculate default date for time-series datasets (2 days ago)
+    default_time_series_date = date.today() - timedelta(days=2)
     
     # ========== DATA SOURCES ==========
     SOURCES[SourceId.NASA_GIBS] = Source(
@@ -69,7 +72,7 @@ def initialize_catalog():
         supports_time_series=True,
         date_range_start=date(2015, 11, 24),
         date_range_end=date.today(),
-        default_date=date.today(),
+        default_date=default_time_series_date,
         variants=[
             Variant(
                 id="true_color",
@@ -102,7 +105,7 @@ def initialize_catalog():
         supports_time_series=True,
         date_range_start=date(2000, 2, 24),
         date_range_end=date.today(),
-        default_date=date.today(),
+        default_date=default_time_series_date,
         variants=[
             Variant(
                 id="true_color",
