@@ -20,10 +20,6 @@ Watch the platform in action: [`zoomers-demo.mov`](https://drive.google.com/file
 
 A comprehensive platform for exploring, analyzing, and annotating satellite imagery with interactive mapping and data management capabilities.
 
-## 🎥 Demo
-
-Watch the platform in action: [`zoomers-demo.mov`](./zoomers-demo.mov)
-
 ## 🌌 Data Structure
 
 The application uses a hierarchical catalog system:
