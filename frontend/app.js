@@ -1421,6 +1421,21 @@ function initializeEventListeners() {
     
     // Sheet tabs (inside bottom sheet)
     const sheetTabs = document.querySelectorAll('.sheet-tab');
+    const sheetTabsContainer = document.querySelector('.sheet-tabs');
+    
+    function updateTabIndicator(activeTab) {
+        if (!activeTab || !sheetTabsContainer) return;
+        
+        const containerRect = sheetTabsContainer.getBoundingClientRect();
+        const tabRect = activeTab.getBoundingClientRect();
+        
+        const left = tabRect.left - containerRect.left;
+        const width = tabRect.width;
+        
+        sheetTabsContainer.style.setProperty('--tab-left', `${left}px`);
+        sheetTabsContainer.style.setProperty('--tab-width', `${width}px`);
+    }
+    
     sheetTabs.forEach(tab => {
         tab.addEventListener('click', () => {
             const panelId = tab.id.replace('tab-', 'panel-');
@@ -1429,7 +1444,30 @@ function initializeEventListeners() {
             // Update active state
             sheetTabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
+            
+            // Update sliding indicator position
+            updateTabIndicator(tab);
         });
+    });
+    
+    // Initialize tab indicator on load
+    const initializeTabIndicator = () => {
+        const activeTab = document.querySelector('.sheet-tab.active');
+        if (activeTab && sheetTabsContainer) {
+            updateTabIndicator(activeTab);
+        }
+    };
+    
+    // Try multiple times to ensure tabs are rendered
+    setTimeout(initializeTabIndicator, 100);
+    setTimeout(initializeTabIndicator, 300);
+    
+    // Also update on window resize
+    window.addEventListener('resize', () => {
+        const activeTab = document.querySelector('.sheet-tab.active');
+        if (activeTab) {
+            updateTabIndicator(activeTab);
+        }
     });
     
     // Note: Subject cards are now rendered dynamically in renderCategoriesWithSubjects()
@@ -1630,9 +1668,23 @@ function openBottomSheet(panelId) {
     floatingButtons.classList.add('hidden');
     
     // Show bottom sheet after a short delay
-setTimeout(() => {
+    setTimeout(() => {
         controlSheet.classList.remove('hidden');
         controlSheet.classList.remove('collapsed');
+        
+        // Update tab indicator after sheet is visible
+        setTimeout(() => {
+            const activeTab = document.querySelector('.sheet-tab.active');
+            const sheetTabsContainer = document.querySelector('.sheet-tabs');
+            if (activeTab && sheetTabsContainer) {
+                const containerRect = sheetTabsContainer.getBoundingClientRect();
+                const tabRect = activeTab.getBoundingClientRect();
+                const left = tabRect.left - containerRect.left;
+                const width = tabRect.width;
+                sheetTabsContainer.style.setProperty('--tab-left', `${left}px`);
+                sheetTabsContainer.style.setProperty('--tab-width', `${width}px`);
+            }
+        }, 50);
     }, 100);
     
     // Switch to the selected panel
