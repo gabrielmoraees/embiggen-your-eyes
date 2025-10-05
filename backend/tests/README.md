@@ -1,53 +1,69 @@
-# Test Suite for Embiggen Your Eyes API
+# Test Suite
 
-Comprehensive test suite organized by test type following Python testing best practices.
+Comprehensive test suite organized by architecture layer and feature, following the same clean architecture pattern as the main application.
 
 ## Structure
 
 ```
 tests/
-├── conftest.py                    # Pytest fixtures and configuration
-├── unit/                          # Unit tests
-│   └── test_models.py             # Data model validation tests
-├── integration/                   # Integration tests
-│   └── test_api_endpoints.py     # API endpoint tests
-└── e2e/                           # End-to-end tests
-    └── test_frontend_workflows.py # Complete user workflow tests
+├── conftest.py                      # Pytest fixtures and configuration
+│
+├── unit/                            # Unit tests
+│   ├── models/                      # Model layer tests
+│   │   ├── test_enums.py           # Enumeration tests
+│   │   └── test_schemas.py         # Pydantic schema tests
+│   └── services/                    # Service layer tests
+│       └── (future service tests)
+│
+├── integration/                     # Integration tests
+│   └── api/                         # API endpoint tests
+│       ├── test_catalog.py         # Catalog endpoints
+│       ├── test_views.py           # View endpoints
+│       ├── test_annotations.py     # Annotation endpoints
+│       └── test_collections.py     # Collection endpoints
+│
+└── e2e/                            # End-to-end tests
+    └── test_workflows.py           # Complete user workflows
 ```
 
 ## Test Categories
 
 ### Unit Tests (`tests/unit/`)
-- Test individual components in isolation
-- Fast execution
-- No external dependencies
-- Test data models, validation, and helper functions
+- **Purpose**: Test individual components in isolation
+- **Speed**: Fast execution
+- **Dependencies**: No external dependencies
+- **Organization**: Mirrors the `app/` structure
+  - `models/`: Test enums and Pydantic schemas
+  - `services/`: Test business logic (future)
 
 ### Integration Tests (`tests/integration/`)
-- Test API endpoints with test client
-- Test database interactions (in-memory for MVP)
-- Verify request/response contracts
-- Test CRUD operations
+- **Purpose**: Test API endpoints with test client
+- **Speed**: Medium execution
+- **Dependencies**: Test client, in-memory storage
+- **Organization**: By feature/domain
+  - `api/test_catalog.py`: Dataset discovery, sources, categories
+  - `api/test_views.py`: User-saved view management
+  - `api/test_annotations.py`: Annotation CRUD
+  - `api/test_collections.py`: Collection management
 
 ### End-to-End Tests (`tests/e2e/`)
-- Test complete user workflows
-- Multi-step scenarios
-- Realistic use cases
-- Test feature integration
+- **Purpose**: Test complete user workflows
+- **Speed**: Slower execution
+- **Dependencies**: Full application stack
+- **Organization**: By user journey
+  - Map discovery workflows
+  - View management workflows
+  - Annotation workflows
+  - Complete user journeys
 
 ## Running Tests
-
-### Install Dependencies
-```bash
-pip install pytest pytest-cov fastapi[all]
-```
 
 ### Run All Tests
 ```bash
 pytest
 ```
 
-### Run Specific Test Categories
+### Run by Category
 ```bash
 # Unit tests only
 pytest tests/unit/
@@ -59,19 +75,26 @@ pytest tests/integration/
 pytest tests/e2e/
 ```
 
-### Run with Coverage
+### Run by Feature
 ```bash
-pytest --cov=. --cov-report=html --cov-report=term
+# Catalog tests
+pytest tests/integration/api/test_catalog.py
+
+# View tests
+pytest tests/integration/api/test_views.py
+
+# Model tests
+pytest tests/unit/models/
 ```
 
-### Run Specific Test File
+### Run with Coverage
 ```bash
-pytest tests/unit/test_models.py
+pytest --cov=app --cov-report=html --cov-report=term
 ```
 
 ### Run Specific Test
 ```bash
-pytest tests/unit/test_models.py::TestBoundingBox::test_valid_bounding_box
+pytest tests/unit/models/test_enums.py::TestEnums::test_category_enum
 ```
 
 ### Run Tests Matching Pattern
@@ -141,6 +164,16 @@ def test_my_workflow(client: TestClient):
 6. **Clean Up**: Tests clean up after themselves (via fixtures)
 7. **Fast Tests**: Keep unit tests fast
 8. **Documentation**: Add docstrings to tests
+9. **Feature Organization**: Group tests by feature, not technical layer
+
+## Test Organization Benefits
+
+The test structure mirrors the application architecture:
+- Easy to find tests for specific features
+- Clear separation between unit, integration, and E2E tests
+- Tests are organized by domain, not technical layer
+- Easy to run tests for specific features
+- Maintainable as the application grows
 
 ## Continuous Integration
 
@@ -152,12 +185,12 @@ These tests are designed to run in CI/CD pipelines:
   run: |
     pip install -r requirements.txt
     pip install pytest pytest-cov
-    pytest --cov=. --cov-report=xml
+    pytest --cov=app --cov-report=xml
 ```
 
 ## Coverage Goals
 
-- Unit tests: >90% coverage
+- Unit tests: >90% coverage of models and services
 - Integration tests: All endpoints covered
 - E2E tests: All major workflows covered
 
@@ -171,13 +204,3 @@ Ensure you're in the backend directory and have installed dependencies.
 
 ### Database State Issues
 Tests use in-memory storage that's cleared between tests via fixtures.
-
-## Test Organization Benefits
-
-The test suite provides:
-- Clear organization by test type
-- Reusable fixtures for common test data
-- Proper test isolation
-- Standard Python testing practices
-- CI/CD compatibility
-- Comprehensive coverage of all API features
