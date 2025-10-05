@@ -39,7 +39,7 @@ class TestCategoriesEndpoint:
         categories = data["categories"]
         category_ids = [c["id"] for c in categories]
         assert "planets" in category_ids
-        assert "moons" in category_ids
+        assert "satellites" in category_ids
 
 
 class TestSourcesEndpoint:

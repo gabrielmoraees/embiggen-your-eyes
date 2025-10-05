@@ -7,7 +7,7 @@ from enum import Enum
 class Category(str, Enum):
     """High-level astronomical object categories"""
     PLANETS = "planets"
-    MOONS = "moons"
+    SATELLITES = "satellites"
     DWARF_PLANETS = "dwarf_planets"
     GALAXIES = "galaxies"
     NEBULAE = "nebulae"
@@ -28,7 +28,7 @@ class Subject(str, Enum):
     URANUS = "uranus"
     NEPTUNE = "neptune"
     
-    # Moons
+    # Satellites (Moons)
     MOON = "moon"  # Earth's moon
     EUROPA = "europa"
     TITAN = "titan"

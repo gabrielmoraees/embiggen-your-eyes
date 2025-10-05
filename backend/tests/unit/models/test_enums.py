@@ -16,7 +16,7 @@ class TestEnums:
     def test_category_enum(self):
         """Test Category enum values"""
         assert Category.PLANETS.value == "planets"
-        assert Category.MOONS.value == "moons"
+        assert Category.SATELLITES.value == "satellites"
         assert Category.GALAXIES.value == "galaxies"
     
     def test_subject_enum(self):

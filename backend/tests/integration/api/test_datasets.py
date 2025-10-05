@@ -301,7 +301,7 @@ class TestDatasetCreation:
         """Test that NASA Trek URLs are detected correctly"""
         request_data = {
             "name": "Trek Test",
-            "category": "moons",
+            "category": "satellites",
             "subject": "moon",
             "url": "https://trek.nasa.gov/tiles/Moon/EQ/LRO_WAC_Mosaic_Global_303ppd_v02/1.0.0/default/default028mm/{z}/{y}/{x}.jpg"
         }

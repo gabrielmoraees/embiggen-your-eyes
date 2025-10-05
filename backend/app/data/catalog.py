@@ -178,7 +178,7 @@ def initialize_catalog():
         name="Lunar Basemap",
         description="OpenPlanetaryMap lunar basemap",
         source_id=SourceId.OPENPLANETARYMAP,
-        category=Category.MOONS,
+        category=Category.SATELLITES,
         subject=Subject.MOON,
         supports_time_series=False,
         variants=[
@@ -200,7 +200,7 @@ def initialize_catalog():
         name="Unified Geologic Map",
         description="USGS Unified Geologic Map of the Moon",
         source_id=SourceId.USGS,
-        category=Category.MOONS,
+        category=Category.SATELLITES,
         subject=Subject.MOON,
         supports_time_series=False,
         variants=[

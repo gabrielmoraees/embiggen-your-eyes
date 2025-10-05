@@ -58,10 +58,10 @@ class TestMapDiscoveryWorkflow:
             assert "subjects" in category
             assert category["dataset_count"] > 0
         
-        # Verify we have planets and moons
+        # Verify we have planets and satellites
         category_ids = [c["id"] for c in categories]
         assert "planets" in category_ids
-        assert "moons" in category_ids
+        assert "satellites" in category_ids
         
         print(f"\n✓ Found {len(categories)} categories with subjects")
     

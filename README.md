@@ -10,7 +10,7 @@ A comprehensive platform for exploring, analyzing, and annotating satellite imag
 
 The application uses a hierarchical catalog system:
 
-- **Categories**: High-level groupings (Planets, Moons, Galaxies, Nebulae, etc.)
+- **Categories**: High-level groupings (Planets, Satellites, Galaxies, Nebulae, etc.)
 - **Subjects**: Specific celestial objects (Earth, Mars, Moon, Mercury, etc.)
 - **Datasets**: Specific data products from providers (e.g., "VIIRS SNPP", "Mars Viking")
 - **Variants**: Visualization variants of datasets (True Color, False Color, etc.)
@@ -20,7 +20,7 @@ The application uses a hierarchical catalog system:
 
 - **Earth** (Planet): VIIRS SNPP, MODIS Terra with time-series support
 - **Mars** (Planet): Viking Mosaic, OpenPlanetaryMap basemap
-- **Moon** (Moon): Lunar basemap, USGS Unified Geologic Map
+- **Moon** (Satellite): Lunar basemap, USGS Unified Geologic Map
 - **Mercury** (Planet): MESSENGER basemap
 - **Custom**: User-uploaded gigapixel images
 
@@ -95,7 +95,7 @@ Interactive map viewer with mobile-friendly Material Design UI. Core features co
 ## 💡 Key Features
 
 ### Core Features
-- **Multi-Subject Exploration**: Browse datasets across planets, moons, and custom imagery
+- **Multi-Subject Exploration**: Browse datasets across planets, satellites, and custom imagery
 - **Dataset Variants**: Multiple visualization modes (True Color, False Color, etc.)
 - **Time-Series Support**: View Earth datasets across different dates
 - **Interactive Annotations**: Add markers, paths, rectangles, and circles directly on datasets
