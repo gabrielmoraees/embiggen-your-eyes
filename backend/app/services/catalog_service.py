@@ -2,7 +2,7 @@
 Catalog service for managing datasets, sources, and categories
 """
 from typing import Optional, List, Dict, Any
-from app.models.enums import Category, Subject, SourceId
+from app.models.enums import Category, Subject, SourceId, get_enum_order
 from app.models.schemas import Source, Dataset
 from app.data.storage import SOURCES, DATASETS
 
@@ -28,12 +28,23 @@ class CatalogService:
             categories[cat]["subjects"].add(dataset.subject.value)
             categories[cat]["sources"].add(dataset.source_id.value)
         
-        # Convert sets to lists for JSON serialization
+        # Convert sets to sorted lists for JSON serialization
         for cat in categories.values():
-            cat["subjects"] = list(cat["subjects"])
-            cat["sources"] = list(cat["sources"])
+            # Sort subjects by enum order, then alphabetically for unordered ones
+            subjects = list(cat["subjects"])
+            cat["subjects"] = sorted(
+                subjects,
+                key=lambda s: (get_enum_order(Subject, s), s)
+            )
+            cat["sources"] = sorted(list(cat["sources"]))
         
-        return {"categories": list(categories.values())}
+        # Sort categories by enum order, then alphabetically for unordered ones
+        sorted_categories = sorted(
+            categories.values(),
+            key=lambda c: (get_enum_order(Category, c["id"]), c["id"])
+        )
+        
+        return {"categories": sorted_categories}
     
     @staticmethod
     def get_sources(

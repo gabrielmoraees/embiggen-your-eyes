@@ -5,11 +5,14 @@ from enum import Enum
 
 
 class Category(str, Enum):
-    """High-level astronomical object categories"""
+    """
+    High-level astronomical object categories
+    Note: Order of definition determines display order in UI
+    """
     PLANETS = "planets"
     SATELLITES = "satellites"
-    DWARF_PLANETS = "dwarf_planets"
     GALAXIES = "galaxies"
+    DWARF_PLANETS = "dwarf_planets"
     NEBULAE = "nebulae"
     STAR_CLUSTERS = "star_clusters"
     PHENOMENA = "phenomena"
@@ -17,8 +20,11 @@ class Category(str, Enum):
 
 
 class Subject(str, Enum):
-    """Specific astronomical objects or subjects"""
-    # Planets
+    """
+    Specific astronomical objects or subjects
+    Note: Order of definition determines display order in UI
+    """
+    # Planets (in display order)
     EARTH = "earth"
     MARS = "mars"
     MERCURY = "mercury"
@@ -37,6 +43,17 @@ class Subject(str, Enum):
     # Galaxies
     MILKY_WAY = "milky_way"
     ANDROMEDA = "andromeda"
+
+
+def get_enum_order(enum_class: type[Enum], value: str) -> int:
+    """
+    Get the ordinal position of an enum value.
+    Returns 999 if not found (for sorting unrecognized values last).
+    """
+    for i, member in enumerate(enum_class):
+        if member.value == value:
+            return i
+    return 999
 
 
 class SourceId(str, Enum):
