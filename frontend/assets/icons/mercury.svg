@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor">
+  <!-- Mercury icon - Flaticon style -->
+  <circle cx="256" cy="256" r="240" fill="#95A5A6" opacity="0.9"/>
+  <path d="M256 16C123.45 16 16 123.45 16 256s107.45 240 240 240 240-107.45 240-240S388.55 16 256 16zm0 448c-114.69 0-208-93.31-208-208S141.31 48 256 48s208 93.31 208 208-93.31 208-208 208z" fill="#7F8C8D"/>
+  <circle cx="200" cy="180" r="25" fill="#5D6D7E" opacity="0.5"/>
+  <circle cx="300" cy="150" r="20" fill="#5D6D7E" opacity="0.5"/>
+  <circle cx="350" cy="280" r="30" fill="#5D6D7E" opacity="0.5"/>
+  <circle cx="180" cy="320" r="22" fill="#5D6D7E" opacity="0.5"/>
+  <circle cx="280" cy="340" r="18" fill="#5D6D7E" opacity="0.5"/>
+</svg>
+

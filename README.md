@@ -6,9 +6,23 @@
 
 A comprehensive platform for exploring, analyzing, and annotating satellite imagery with interactive mapping and data management capabilities.
 
-## 🌌 Data Sources
+## 🌌 Data Structure
 
-Integrates NASA satellite imagery services and supports custom user-uploaded imagery with automatic tile processing.
+The application uses a hierarchical catalog system:
+
+- **Categories**: High-level groupings (Planets, Moons, Galaxies, Nebulae, etc.)
+- **Subjects**: Specific celestial objects (Earth, Mars, Moon, Mercury, etc.)
+- **Datasets**: Specific map products from data providers (e.g., "VIIRS SNPP", "Mars Viking")
+- **Variants**: Visualization variants of datasets (True Color, False Color, etc.)
+- **Sources**: Data providers (NASA GIBS, NASA Trek, OpenPlanetaryMap, USGS, Custom)
+
+### Available Subjects
+
+- **Earth** (Planet): VIIRS SNPP, MODIS Terra with time-series support
+- **Mars** (Planet): Viking Mosaic, OpenPlanetaryMap basemap
+- **Moon** (Moon): Lunar basemap, USGS Unified Geologic Map
+- **Mercury** (Planet): MESSENGER basemap
+- **Custom**: User-uploaded gigapixel images
 
 ## 🚀 Quick Start
 
@@ -80,13 +94,42 @@ Interactive map viewer with mobile-friendly Material Design UI. Core features co
 
 ## 💡 Key Features
 
-Multi-body catalog system with advanced search and analysis capabilities, modern responsive UI.
+### Core Features
+- **Multi-Subject Exploration**: Browse datasets across planets, moons, and custom imagery
+- **Dataset Variants**: Multiple visualization modes (True Color, False Color, etc.)
+- **Time-Series Support**: View Earth datasets across different dates
+- **Interactive Annotations**: Add markers, paths, rectangles, and circles directly on the map
+- **Views**: Save and restore complete map configurations
+- **Collections**: Organize multiple views into thematic collections
+- **iOS-Inspired UI**: Glassmorphism design with adaptive bottom sheet navigation
+
+### Backend Capabilities
+- Clean architecture with separation of concerns
+- RESTful API with automatic documentation
+- Custom image upload and tile processing
+- In-memory storage (MVP) with database-ready structure
+- Comprehensive test suite
 
 ## 🛠️ Technology Stack
 
-**Backend**: FastAPI with clean architecture and tile processing  
-**Frontend**: Vanilla JavaScript with Leaflet.js mapping  
-**Data**: NASA satellite imagery services with custom upload support
+**Backend**: 
+- FastAPI with clean architecture (models, services, routes, data layers)
+- Pydantic for data validation
+- GDAL for image processing
+- Comprehensive test suite
+
+**Frontend**: 
+- Vanilla JavaScript (ES6+)
+- Leaflet.js for interactive mapping
+- Material Design icons
+- iOS 26-inspired glassmorphism UI
+
+**Data Sources**: 
+- NASA GIBS (Earth real-time imagery)
+- NASA Trek (Planetary mapping)
+- OpenPlanetaryMap (Mars, Moon, Mercury)
+- USGS Astrogeology (Geologic maps)
+- Custom user uploads
 
 ## 📁 Project Structure
 
@@ -111,7 +154,11 @@ Supports environmental monitoring, planetary science research, and comparative a
 
 ## 🌟 Innovation Points
 
-Unified multi-body catalog with intelligent navigation, custom image integration, and flexible data management.
+1. **Unified Catalog System**: Hierarchical organization (Category → Subject → Dataset → Variant) allows intuitive exploration
+2. **Flexible Data Model**: Clean separation between catalog data, user views, and annotations
+3. **Mobile-First Design**: iOS-inspired interface with adaptive bottom sheet navigation
+4. **Multi-Source Integration**: Seamlessly combines data from NASA GIBS, Trek, OpenPlanetaryMap, USGS, and custom uploads
+5. **Interactive Annotation Tools**: Direct map interaction for adding markers, paths, and shapes with default naming and inline editing
 
 ## 🏆 NASA Space Apps Challenge 2025
 

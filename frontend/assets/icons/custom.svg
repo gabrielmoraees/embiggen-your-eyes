@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor">
+  <!-- Custom/Telescope icon - Flaticon style -->
+  <path d="M464 256H336c-8.84 0-16-7.16-16-16V112c0-8.84 7.16-16 16-16h128c8.84 0 16 7.16 16 16v128c0 8.84-7.16 16-16 16z" fill="#3498DB" opacity="0.8"/>
+  <rect x="240" y="200" width="80" height="240" rx="8" fill="#2C3E50" opacity="0.9"/>
+  <circle cx="280" cy="320" r="40" fill="#ECF0F1" opacity="0.9"/>
+  <circle cx="280" cy="320" r="25" fill="#3498DB" opacity="0.7"/>
+  <path d="M240 440h80v32H240z" fill="#34495E"/>
+  <line x1="336" y1="160" x2="240" y2="200" stroke="#2C3E50" stroke-width="12"/>
+  <circle cx="100" cy="80" r="4" fill="#F39C12" opacity="0.6"/>
+  <circle cx="140" cy="100" r="3" fill="#F39C12" opacity="0.6"/>
+  <circle cx="80" cy="120" r="5" fill="#F39C12" opacity="0.6"/>
+</svg>
+

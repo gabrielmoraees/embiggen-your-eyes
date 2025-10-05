@@ -9,22 +9,32 @@ const BACKEND_URL = 'http://localhost:8000';
 // Application State
 // ============================================================================
 const AppState = {
-    currentCelestialBody: 'earth',
-    currentLayer: null,
+    // New backend structure
+    currentCategory: 'planets',
+    currentSubject: 'earth',
+    currentDataset: null,
+    currentVariant: null,
     currentDate: getDefaultDate(),
-    currentImage: null,
-    baseLay: null,
+    currentView: null,
+    
+    // Map layers
+    baseLayer: null,
     overlayLayers: [],
-    markers: [],
+    
+    // Catalog data
+    categories: [],
+    datasets: [],
+    sources: [],
+    
+    // User data
+    views: [],
     annotations: [],
     collections: [],
-    links: [],
-    images: [],
-    availableLayers: [],
+    
+    // UI state
     compareMode: 'overlay',
-    compareImages: [],
-    searchHistory: [],
-    suggestions: [],
+    compareViews: [],
+    
     // Drawing state
     drawingMode: null, // 'marker', 'path', 'rectangle', 'circle'
     drawingPath: [],
@@ -143,55 +153,100 @@ function initializeMap() {
 // Backend API Functions
 // ============================================================================
 
-async function loadAvailableLayers(celestialBody = null) {
+async function loadCategories() {
     try {
-        const endpoint = celestialBody 
-            ? `/api/layers?celestial_body=${celestialBody}`
-            : '/api/layers';
+        const data = await apiRequest('/api/categories');
+        AppState.categories = data.categories || [];
+        console.log(`Loaded ${AppState.categories.length} categories`);
+        return AppState.categories;
+    } catch (error) {
+        console.error('Failed to load categories:', error);
+        return [];
+    }
+}
+
+async function loadDatasets(category = null, subject = null, sourceId = null) {
+    try {
+        let endpoint = '/api/datasets?';
+        const params = [];
+        if (category) params.push(`category=${category}`);
+        if (subject) params.push(`subject=${subject}`);
+        if (sourceId) params.push(`source_id=${sourceId}`);
+        
+        endpoint += params.join('&');
+        
         const data = await apiRequest(endpoint);
-        AppState.availableLayers = data.layers;
-        
-        renderLayersList(data.layers);
-        
-        // Auto-select first layer
-        if (data.layers.length > 0 && !AppState.currentLayer) {
-            AppState.currentLayer = data.layers[0].value;
+        AppState.datasets = data.datasets || [];
+        console.log(`Loaded ${AppState.datasets.length} datasets`);
+        return AppState.datasets;
+    } catch (error) {
+        console.error('Failed to load datasets:', error);
+        return [];
+    }
+}
+
+async function loadDataset(datasetId) {
+    try {
+        const dataset = await apiRequest(`/api/datasets/${datasetId}`);
+        console.log(`Loaded dataset: ${dataset.name}`);
+        return dataset;
+    } catch (error) {
+        console.error('Failed to load dataset:', error);
+        return null;
+    }
+}
+
+async function loadDatasetVariants(datasetId) {
+    try {
+        const data = await apiRequest(`/api/datasets/${datasetId}/variants`);
+        console.log(`Loaded ${data.variants?.length || 0} variants for dataset ${datasetId}`);
+        return data.variants || [];
+    } catch (error) {
+        console.error('Failed to load variants:', error);
+        return [];
+    }
+}
+
+async function loadVariantWithUrls(datasetId, variantId, date = null) {
+    try {
+        let endpoint = `/api/datasets/${datasetId}/variants/${variantId}`;
+        if (date) {
+            endpoint += `?date_param=${date}`;
         }
-        
-        console.log(`Loaded ${data.layers.length} layers for ${celestialBody || 'all bodies'}`);
-        return data.layers;
+        const variant = await apiRequest(endpoint);
+        console.log(`Loaded variant: ${variant.name}`);
+        return variant;
     } catch (error) {
-        console.error('Failed to load layers:', error);
+        console.error('Failed to load variant:', error);
+        return null;
+    }
+}
+
+async function loadSources(category = null, subject = null) {
+    try {
+        let endpoint = '/api/sources?';
+        const params = [];
+        if (category) params.push(`category=${category}`);
+        if (subject) params.push(`subject=${subject}`);
+        
+        endpoint += params.join('&');
+        
+        const data = await apiRequest(endpoint);
+        AppState.sources = data.sources || [];
+        console.log(`Loaded ${AppState.sources.length} sources`);
+        return AppState.sources;
+    } catch (error) {
+        console.error('Failed to load sources:', error);
         return [];
     }
 }
 
-async function searchImages(layer, dateStart, dateEnd, celestialBody = 'earth', limit = 1) {
+async function loadAnnotations(viewId = null) {
     try {
-        const images = await apiRequest('/api/search/images', {
-            method: 'POST',
-            body: JSON.stringify({
-                celestial_body: celestialBody,
-                layer: layer,
-                date_start: dateStart,
-                date_end: dateEnd,
-                projection: 'epsg3857',
-                limit: limit
-            })
-        });
-        
-        AppState.images = images;
-        console.log(`Found ${images.length} images`);
-        return images;
-    } catch (error) {
-        console.error('Failed to search images:', error);
-        return [];
-    }
-}
-
-async function loadAnnotations(imageId) {
-    try {
-        const annotations = await apiRequest(`/api/annotations/image/${imageId}`);
+        const endpoint = viewId 
+            ? `/api/annotations?map_view_id=${viewId}`
+            : '/api/annotations';
+        const annotations = await apiRequest(endpoint);
         AppState.annotations = annotations;
         
         // Display all annotations on map
@@ -205,12 +260,12 @@ async function loadAnnotations(imageId) {
     }
 }
 
-async function createAnnotation(imageId, type, coordinates, text, color = '#007AFF', properties = {}) {
+async function createAnnotation(type, coordinates, text, color = '#007AFF', properties = {}) {
     try {
         const annotation = await apiRequest('/api/annotations', {
             method: 'POST',
             body: JSON.stringify({
-                image_id: imageId,
+                map_view_id: AppState.currentView?.id || null,
                 type: type,
                 coordinates: coordinates,
                 text: text,
@@ -249,6 +304,52 @@ async function deleteAnnotation(annotationId) {
     }
 }
 
+async function loadViews() {
+    try {
+        const views = await apiRequest('/api/views');
+        AppState.views = views;
+        console.log(`Loaded ${views.length} saved views`);
+        return views;
+    } catch (error) {
+        console.error('Failed to load views:', error);
+        return [];
+    }
+}
+
+async function createView(name, description = null) {
+    try {
+        if (!AppState.currentDataset || !AppState.currentVariant) {
+            console.warn('No dataset/variant selected');
+            return null;
+        }
+        
+        const center = map.getCenter();
+        const view = await apiRequest('/api/views', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: name,
+                description: description,
+                dataset_id: AppState.currentDataset.id,
+                variant_id: AppState.currentVariant.id,
+                selected_date: AppState.currentDate || null,
+                center_lat: center.lat,
+                center_lng: center.lng,
+                zoom_level: map.getZoom(),
+                active_layers: AppState.overlayLayers.map(l => l.id),
+                annotation_ids: AppState.annotations.map(a => a.id)
+            })
+        });
+        
+        AppState.views.push(view);
+        AppState.currentView = view;
+        console.log(`Created view: ${view.name}`);
+        return view;
+    } catch (error) {
+        console.error('Failed to create view:', error);
+        return null;
+    }
+}
+
 async function loadCollections() {
     try {
         const collections = await apiRequest('/api/collections');
@@ -261,14 +362,14 @@ async function loadCollections() {
     }
 }
 
-async function createCollection(name, description) {
+async function createCollection(name, description, viewIds = []) {
     try {
         const collection = await apiRequest('/api/collections', {
             method: 'POST',
             body: JSON.stringify({
                 name: name,
                 description: description,
-                image_ids: []
+                view_ids: viewIds
             })
         });
         
@@ -281,29 +382,17 @@ async function createCollection(name, description) {
     }
 }
 
-async function loadSuggestions(imageId) {
-    try {
-        const suggestions = await apiRequest(`/api/suggestions/similar/${imageId}`);
-        AppState.suggestions = suggestions;
-        renderSuggestionsList(suggestions);
-        return suggestions;
-    } catch (error) {
-        console.error('Failed to load suggestions:', error);
-        return [];
-    }
-}
-
 // ============================================================================
 // Layer Management
 // ============================================================================
 
-function createTileLayer(imageMetadata) {
-    const tileLayer = L.tileLayer(imageMetadata.tile_url, {
-        attribution: '© NASA',
+function createTileLayer(tileUrl, maxZoom = 18, attribution = '© NASA') {
+    const tileLayer = L.tileLayer(tileUrl, {
+        attribution: attribution,
         tileSize: 256,
-        noWrap: AppState.currentCelestialBody === 'earth',
+        noWrap: AppState.currentSubject === 'earth',
         minZoom: 0,
-        maxZoom: imageMetadata.max_zoom || 9,
+        maxZoom: maxZoom,
         bounds: [[-85.0511, -180], [85.0511, 180]]
     });
     
@@ -319,49 +408,56 @@ function createTileLayer(imageMetadata) {
 }
 
 async function updateBaseLayer() {
-    if (!AppState.currentLayer) return;
-    
-    const images = await searchImages(
-        AppState.currentLayer,
-        AppState.currentDate,
-        AppState.currentDate,
-        AppState.currentCelestialBody,
-        1
-    );
-    
-    if (images.length === 0) {
-        showStatus('No images found', 'warning');
+    if (!AppState.currentDataset || !AppState.currentVariant) {
+        console.warn('No dataset or variant selected');
         return;
     }
     
-    const imageMetadata = images[0];
-    AppState.currentImage = imageMetadata;
-    
-    // Remove old base layer
-    if (gibsLayer) {
+    try {
+        // Load the variant with resolved tile URLs
+        const response = await loadVariantWithUrls(
+            AppState.currentDataset.id,
+            AppState.currentVariant.id,
+            AppState.currentDate
+        );
+        
+        // Backend returns {dataset_id, variant: {...}}
+        const variant = response?.variant;
+        
+        if (!variant || !variant.tile_url) {
+            showStatus('No tile URL found', 'warning');
+            console.error('Variant response:', response);
+            return;
+        }
+        
+        // Remove old base layer
+        if (gibsLayer) {
     map.removeLayer(gibsLayer);
-    }
-    
-    // Create new base layer
-    gibsLayer = createTileLayer(imageMetadata);
+        }
+        
+        // Get attribution from source
+        const source = AppState.sources.find(s => s.id === AppState.currentDataset.source_id);
+        const attribution = source ? source.attribution : '© NASA';
+        
+        // Create new base layer
+        gibsLayer = createTileLayer(variant.tile_url, variant.max_zoom || 18, attribution);
     gibsLayer.addTo(map);
     
-    // Update UI
-    const baseLayerName = document.getElementById('base-layer-name');
-    if (baseLayerName) {
-        const layer = AppState.availableLayers.find(l => l.value === AppState.currentLayer);
-        baseLayerName.textContent = layer ? layer.display_name : 'Unknown Layer';
+        // Update UI
+        const baseLayerName = document.getElementById('base-layer-name');
+        if (baseLayerName) {
+            baseLayerName.textContent = `${AppState.currentDataset.name} - ${variant.name}`;
+        }
+        
+        // Update map attribution
+        map.attributionControl.setPrefix('');
+        
+        showStatus('Map loaded', 'success');
+        console.log(`Loaded: ${AppState.currentDataset.name} - ${variant.name}`);
+    } catch (error) {
+        console.error('Failed to update base layer:', error);
+        showStatus('Failed to load map', 'error');
     }
-    
-    // Load annotations
-    await loadAnnotations(imageMetadata.id);
-    
-    // Load suggestions
-    if (imageMetadata.id) {
-        await loadSuggestions(imageMetadata.id);
-    }
-    
-    console.log(`Loaded image: ${imageMetadata.id}`);
 }
 
 // ============================================================================
@@ -369,7 +465,7 @@ async function updateBaseLayer() {
 // ============================================================================
 
 function handleMapClick(e) {
-    if (!AppState.drawingMode || !AppState.currentImage) return;
+    if (!AppState.drawingMode) return;
     
     const latlng = e.latlng;
     
@@ -423,7 +519,6 @@ async function createMarkerAnnotation(latlng) {
     const name = `Marker ${AppState.annotations.length + 1}`;
     
     const annotation = await createAnnotation(
-        AppState.currentImage.id,
         'point',
         [{lat: latlng.lat, lng: latlng.lng}],
         name,
@@ -483,7 +578,6 @@ async function finishPath() {
     const coordinates = AppState.drawingPath.map(p => ({lat: p.lat, lng: p.lng}));
     
     const annotation = await createAnnotation(
-        AppState.currentImage.id,
         'polygon',
         coordinates,
         name,
@@ -533,7 +627,6 @@ async function finishRectangle(latlng) {
     ];
     
     const annotation = await createAnnotation(
-        AppState.currentImage.id,
         'rectangle',
         coordinates,
         name,
@@ -584,7 +677,6 @@ async function finishCircle(latlng) {
     ];
     
     const annotation = await createAnnotation(
-        AppState.currentImage.id,
         'circle',
         coordinates,
         name,
@@ -760,15 +852,202 @@ function removeOverlayLayer(index) {
 // UI Rendering Functions
 // ============================================================================
 
-function renderLayersList(layers) {
+// Subject icon mapping - Using SVG icons from Flaticon-style assets
+const SUBJECT_ICONS = {
+    // Planets - SVG icons
+    earth: 'assets/icons/earth.svg',
+    mars: 'assets/icons/mars.svg',
+    mercury: 'assets/icons/mercury.svg',
+    venus: 'assets/icons/earth.svg',    // Reuse Earth, replace with venus.svg later
+    jupiter: 'assets/icons/saturn.svg',  // Reuse Saturn, replace with jupiter.svg later
+    saturn: 'assets/icons/saturn.svg',
+    uranus: 'assets/icons/earth.svg',    // Reuse Earth, replace with uranus.svg later
+    neptune: 'assets/icons/earth.svg',   // Reuse Earth, replace with neptune.svg later
+    
+    // Moons
+    moon: 'assets/icons/moon.svg',
+    europa: 'assets/icons/moon.svg',     // Reuse Moon, replace with europa.svg later
+    titan: 'assets/icons/moon.svg',      // Reuse Moon, replace with titan.svg later
+    enceladus: 'assets/icons/moon.svg',  // Reuse Moon, replace with enceladus.svg later
+    
+    // Deep space
+    milky_way: 'assets/icons/galaxy.svg',
+    andromeda: 'assets/icons/galaxy.svg',
+    
+    // Custom
+    custom: 'assets/icons/custom.svg'
+};
+
+// Category icon mapping - Using SVG icons
+const CATEGORY_ICONS = {
+    planets: 'assets/icons/earth.svg',
+    moons: 'assets/icons/moon.svg',
+    dwarf_planets: 'assets/icons/mercury.svg',
+    galaxies: 'assets/icons/galaxy.svg',
+    nebulae: 'assets/icons/galaxy.svg',    // Reuse galaxy, replace with nebula.svg later
+    star_clusters: 'assets/icons/galaxy.svg', // Reuse galaxy, replace with cluster.svg later
+    phenomena: 'assets/icons/galaxy.svg',  // Reuse galaxy, replace with phenomena.svg later
+    regions: 'assets/icons/custom.svg',
+    custom: 'assets/icons/custom.svg'
+};
+
+function renderCategoriesWithSubjects() {
+    const categoriesList = document.getElementById('categories-list');
+    if (!categoriesList) {
+        console.error('categories-list element not found');
+        return;
+    }
+    
+    categoriesList.innerHTML = '';
+    
+    if (!AppState.categories || AppState.categories.length === 0) {
+        categoriesList.innerHTML = '<div class="panel-desc">Loading categories...</div>';
+        console.log('No categories available yet');
+        return;
+    }
+    
+    console.log(`Rendering ${AppState.categories.length} categories`);
+    
+    AppState.categories.forEach(category => {
+        const group = document.createElement('div');
+        group.className = 'category-group';
+        
+        const subjectsHTML = category.subjects.map(subject => {
+            const iconPath = SUBJECT_ICONS[subject] || SUBJECT_ICONS.custom;
+            // Get dataset count for this subject
+            const datasetCount = AppState.datasets ? AppState.datasets.filter(d => 
+                d.subject === subject && d.category === category.id
+            ).length : 0;
+            
+            const isActive = AppState.currentSubject === subject ? 'active' : '';
+            
+            return `
+                <div class="subject-card ${isActive}" data-category="${category.id}" data-subject="${subject}">
+                    <img src="${iconPath}" alt="${subject}" class="subject-icon" />
+                    <div class="subject-name">${subject.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
+                    ${datasetCount > 0 ? `<div class="subject-count">${datasetCount} dataset${datasetCount > 1 ? 's' : ''}</div>` : ''}
+                </div>
+            `;
+        }).join('');
+        
+        const categoryIconPath = CATEGORY_ICONS[category.id] || CATEGORY_ICONS.custom;
+        
+        group.innerHTML = `
+            <div class="category-header">
+                <img src="${categoryIconPath}" alt="${category.id}" class="category-icon" />
+                <div class="category-info">
+                    <div class="category-name">${category.name}</div>
+                    <div class="category-meta">${category.dataset_count} datasets • ${category.subjects.length} subjects</div>
+                </div>
+            </div>
+            <div class="subjects-grid">
+                ${subjectsHTML}
+            </div>
+        `;
+        
+        categoriesList.appendChild(group);
+    });
+    
+    console.log('Categories rendered, adding event listeners');
+    
+    // Add event listeners to subject cards
+    document.querySelectorAll('.subject-card').forEach(card => {
+        card.addEventListener('click', async () => {
+            const category = card.dataset.category;
+            const subject = card.dataset.subject;
+            
+            console.log(`Subject clicked: ${category} > ${subject}`);
+            
+            AppState.currentCategory = category;
+            AppState.currentSubject = subject;
+            
+            // Load datasets for this subject
+            const datasets = await loadDatasets(category, subject);
+            
+            // Auto-select first dataset if available
+            if (datasets.length > 0) {
+                AppState.currentDataset = datasets[0];
+                
+                // Load variants for the first dataset
+                const variants = await loadDatasetVariants(datasets[0].id);
+                if (variants.length > 0) {
+                    AppState.currentVariant = variants.find(v => v.is_default) || variants[0];
+                    
+                    // Show variant selector
+                    renderVariantSelector(variants);
+                    
+                    // Update date picker visibility
+                    updateDatePickerVisibility(datasets[0]);
+                    
+                    // Update map with selected dataset
+                    await updateBaseLayer();
+                }
+            }
+            
+            // Render datasets list AFTER setting current dataset (so active state shows)
+            renderDatasetsList(datasets);
+            
+            // Update breadcrumb
+            updateBreadcrumb();
+            
+            // Switch to datasets panel
+            switchPanel('panel-layers');
+            document.getElementById('btn-layers').classList.add('active');
+            document.getElementById('btn-bodies').classList.remove('active');
+        });
+    });
+}
+
+function updateBreadcrumb() {
+    const breadcrumb = document.getElementById('dataset-breadcrumb');
+    if (!breadcrumb) return;
+    
+    const parts = [];
+    if (AppState.currentCategory) {
+        parts.push(AppState.currentCategory.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()));
+    }
+    if (AppState.currentSubject) {
+        parts.push(AppState.currentSubject.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()));
+    }
+    if (AppState.currentDataset) {
+        parts.push(AppState.currentDataset.name);
+    }
+    
+    breadcrumb.textContent = parts.join(' › ');
+}
+
+function renderDatasetsList(datasets) {
     const layersList = document.getElementById('layers-list');
+    if (!layersList) {
+        console.error('layers-list element not found');
+        return;
+    }
+    
     layersList.innerHTML = '';
     
-    layers.forEach(layer => {
+    console.log(`Rendering ${datasets.length} datasets`);
+    
+    if (datasets.length === 0) {
+        layersList.innerHTML = '<div class="panel-desc">No datasets available for this selection</div>';
+        return;
+    }
+    
+    datasets.forEach(dataset => {
         const card = document.createElement('div');
         card.className = 'layer-card';
-        if (layer.value === AppState.currentLayer) {
+        const isActive = AppState.currentDataset && dataset.id === AppState.currentDataset.id;
+        if (isActive) {
             card.classList.add('active');
+            console.log(`✓ Dataset "${dataset.name}" marked as active`);
+        }
+        
+        // Build badges
+        const badges = [];
+        if (dataset.supports_time_series) {
+            badges.push(`<span class="layer-badge"><span class="material-icons-round">schedule</span>Time-series</span>`);
+        }
+        if (dataset.variants && dataset.variants.length > 1) {
+            badges.push(`<span class="layer-badge">${dataset.variants.length} variants</span>`);
         }
         
         card.innerHTML = `
@@ -776,19 +1055,116 @@ function renderLayersList(layers) {
                 <span class="material-icons-round">terrain</span>
             </div>
             <div class="layer-info">
-                <div class="layer-name">${layer.display_name}</div>
-                <div class="layer-desc">${layer.type}</div>
-        </div>
-    `;
+                <div class="layer-name">
+                    ${dataset.name}
+                    ${badges.join('')}
+                </div>
+                <div class="layer-desc">${dataset.description}</div>
+            </div>
+        `;
         
-        card.addEventListener('click', () => {
-            AppState.currentLayer = layer.value;
-            updateBaseLayer();
-            renderLayersList(layers);
+        card.addEventListener('click', async () => {
+            AppState.currentDataset = dataset;
+            
+            // Load variants for this dataset
+            const variants = await loadDatasetVariants(dataset.id);
+            if (variants.length > 0) {
+                // Find default variant or use first one
+                const defaultVariant = variants.find(v => v.is_default) || variants[0];
+                AppState.currentVariant = defaultVariant;
+                
+                // Show variant selector if multiple variants
+                renderVariantSelector(variants);
+                
+                // Show/hide date picker based on time-series support
+                updateDatePickerVisibility(dataset);
+                
+                // Update map
+                await updateBaseLayer();
+            }
+            
+            // Update breadcrumb
+            updateBreadcrumb();
+            
+            renderDatasetsList(datasets);
         });
         
         layersList.appendChild(card);
     });
+}
+
+function renderVariantSelector(variants) {
+    const variantSection = document.getElementById('variant-section');
+    const variantSelector = document.getElementById('variant-selector');
+    
+    if (!variantSection || !variantSelector) {
+        console.error('Variant selector elements not found');
+        return;
+    }
+    
+    if (!variants || variants.length === 0) {
+        variantSection.classList.add('hidden');
+        return;
+    }
+    
+    // Show variant section (even for single variant to show what's selected)
+    variantSection.classList.remove('hidden');
+    variantSelector.innerHTML = '';
+    
+    console.log(`Rendering ${variants.length} variant(s), current: ${AppState.currentVariant?.id}`);
+    
+    variants.forEach(variant => {
+        const card = document.createElement('div');
+        card.className = 'variant-card';
+        if (AppState.currentVariant && variant.id === AppState.currentVariant.id) {
+            card.classList.add('active');
+        }
+        
+        card.innerHTML = `
+            <div class="variant-name">${variant.name}</div>
+            <div class="variant-desc">${variant.description}</div>
+        `;
+        
+        card.addEventListener('click', async () => {
+            AppState.currentVariant = variant;
+            await updateBaseLayer();
+            renderVariantSelector(variants);
+        });
+        
+        variantSelector.appendChild(card);
+    });
+}
+
+function updateDatePickerVisibility(dataset) {
+    const dateSection = document.getElementById('date-section');
+    const datePicker = document.getElementById('date-picker');
+    const dateRangeInfo = document.getElementById('date-range-info');
+    
+    if (!dataset.supports_time_series) {
+        dateSection.classList.add('hidden');
+        return;
+    }
+    
+    dateSection.classList.remove('hidden');
+    
+    // Set date range
+    if (dataset.date_range_start && dataset.date_range_end) {
+        const start = new Date(dataset.date_range_start).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+        const end = new Date(dataset.date_range_end).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+        dateRangeInfo.textContent = `(${start} - ${end})`;
+        
+        // Set min/max on date picker
+        datePicker.min = dataset.date_range_start;
+        datePicker.max = dataset.date_range_end;
+    } else {
+        dateRangeInfo.textContent = '';
+    }
+    
+    // Set default value
+    if (dataset.default_date) {
+        datePicker.value = dataset.default_date;
+        AppState.currentDate = dataset.default_date;
+    }
 }
 
 function renderOverlayLayers() {
@@ -808,7 +1184,7 @@ function renderOverlayLayers() {
             <div class="overlay-info">
                 <div class="overlay-name">Overlay ${index + 1}</div>
                 <div class="overlay-desc">${layer ? layer.display_name : 'Unknown'}</div>
-            </div>
+        </div>
             <button class="icon-btn" onclick="removeOverlayLayer(${index})">
                 <span class="material-icons-round">close</span>
             </button>
@@ -979,36 +1355,41 @@ function initializeEventListeners() {
         });
     });
     
-    // Celestial body cards
-    const bodyCards = document.querySelectorAll('.body-card');
-    bodyCards.forEach(card => {
-        card.addEventListener('click', async () => {
-            const body = card.dataset.body;
-            AppState.currentCelestialBody = body;
-            
-            // Update active state
-            bodyCards.forEach(c => c.classList.remove('active'));
-            card.classList.add('active');
-            
-            // Show/hide date section
-            const dateSection = document.getElementById('date-section');
-            dateSection.style.display = body === 'earth' ? 'block' : 'none';
-            
-            // Load layers for this body
-            await loadAvailableLayers(body);
-            
-            // Switch to layers panel
-            switchPanel('panel-layers');
-            document.getElementById('btn-layers').classList.add('active');
-            document.getElementById('btn-bodies').classList.remove('active');
-        });
-    });
+    // Note: Subject cards are now rendered dynamically in renderCategoriesWithSubjects()
+    // Event listeners are added there
     
     // Date picker
-    document.getElementById('date-picker').value = AppState.currentDate;
-    document.getElementById('date-picker').addEventListener('change', (e) => {
+    const datePicker = document.getElementById('date-picker');
+    datePicker.value = AppState.currentDate;
+    datePicker.addEventListener('change', (e) => {
         AppState.currentDate = e.target.value;
         updateBaseLayer();
+    });
+    
+    // Quick date buttons
+    document.querySelectorAll('.date-quick-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const offset = parseInt(btn.dataset.offset);
+            const newDate = new Date();
+            newDate.setDate(newDate.getDate() + offset);
+            
+            // Format date as YYYY-MM-DD
+            const dateStr = newDate.toISOString().split('T')[0];
+            
+            // Check if date is within dataset range
+            const dateInput = document.getElementById('date-picker');
+            const min = dateInput.min;
+            const max = dateInput.max;
+            
+            if ((min && dateStr < min) || (max && dateStr > max)) {
+                showStatus(`Date out of range. Available: ${min} to ${max}`, 'warning');
+                return;
+            }
+            
+            AppState.currentDate = dateStr;
+            datePicker.value = dateStr;
+            updateBaseLayer();
+        });
     });
     
     // Map controls
@@ -1052,52 +1433,52 @@ function initializeEventListeners() {
         popover.classList.toggle('hidden');
     });
     
-    // Tool buttons
+    // Tool buttons - work with any loaded dataset
     document.getElementById('tool-marker').addEventListener('click', () => {
-        if (AppState.currentImage) {
+        if (AppState.currentDataset) {
             if (AppState.drawingMode === 'marker') {
                 exitDrawingMode();
             } else {
                 enterDrawingMode('marker');
             }
         } else {
-            showStatus('Select a celestial body and layer first', 'warning');
+            showStatus('Please select a dataset first', 'warning');
         }
     });
     
     document.getElementById('tool-path').addEventListener('click', () => {
-        if (AppState.currentImage) {
+        if (AppState.currentDataset) {
             if (AppState.drawingMode === 'path') {
                 exitDrawingMode();
             } else {
                 enterDrawingMode('path');
             }
         } else {
-            showStatus('Select a celestial body and layer first', 'warning');
+            showStatus('Please select a dataset first', 'warning');
         }
     });
     
     document.getElementById('tool-rectangle').addEventListener('click', () => {
-        if (AppState.currentImage) {
+        if (AppState.currentDataset) {
             if (AppState.drawingMode === 'rectangle') {
                 exitDrawingMode();
             } else {
                 enterDrawingMode('rectangle');
             }
         } else {
-            showStatus('Select a celestial body and layer first', 'warning');
+            showStatus('Please select a dataset first', 'warning');
         }
     });
     
     document.getElementById('tool-circle').addEventListener('click', () => {
-        if (AppState.currentImage) {
+        if (AppState.currentDataset) {
             if (AppState.drawingMode === 'circle') {
                 exitDrawingMode();
             } else {
                 enterDrawingMode('circle');
             }
         } else {
-            showStatus('Select a celestial body and layer first', 'warning');
+            showStatus('Please select a dataset first', 'warning');
         }
     });
     
@@ -1120,6 +1501,11 @@ function switchPanel(panelId) {
     const selectedPanel = document.getElementById(panelId);
     if (selectedPanel) {
         selectedPanel.classList.add('active');
+    }
+    
+    // Re-render Explore panel to restore selected subject state
+    if (panelId === 'panel-bodies') {
+        renderCategoriesWithSubjects();
     }
     
     // Expand sheet if collapsed
@@ -1152,7 +1538,7 @@ async function initializeApp() {
     
     // Test backend connection
     try {
-        const response = await fetch(`${BACKEND_URL}/`);
+        const response = await fetch(`${BACKEND_URL}/api/health`);
         const data = await response.json();
         console.log('✓ Backend connected:', data);
         showStatus('Connected', 'success');
@@ -1162,13 +1548,57 @@ async function initializeApp() {
         return;
     }
     
-    // Load initial data
-    await loadAvailableLayers(AppState.currentCelestialBody);
+    // Load catalog data
+    console.log('📦 Loading catalog data...');
+    await loadCategories();
+    console.log('Categories loaded:', AppState.categories);
+    
+    await loadSources();
+    console.log('Sources loaded:', AppState.sources);
+    
+    // Load ALL datasets to populate subject counts
+    console.log('📊 Loading all datasets...');
+    const allDatasets = await loadDatasets();
+    AppState.datasets = allDatasets;
+    console.log(`Datasets loaded: ${allDatasets.length} total`);
+    
+    // Render categories with subjects
+    console.log('🎨 Rendering categories with subjects...');
+    renderCategoriesWithSubjects();
+    console.log('Categories rendered');
+    
     await loadCollections();
     
-    // Load initial image
-    if (AppState.currentLayer) {
-        await updateBaseLayer();
+    // Set initial state
+    AppState.currentCategory = 'planets';
+    AppState.currentSubject = 'earth';
+    
+    // Load initial datasets for the default subject (Earth)
+    const datasets = await loadDatasets('planets', 'earth');
+    if (datasets.length > 0) {
+        // Select first dataset
+        AppState.currentDataset = datasets[0];
+        
+        // Load its variants
+        const variants = await loadDatasetVariants(datasets[0].id);
+        if (variants.length > 0) {
+            AppState.currentVariant = variants.find(v => v.is_default) || variants[0];
+            
+            // Show variant selector
+            renderVariantSelector(variants);
+            
+            // Update date picker
+            updateDatePickerVisibility(datasets[0]);
+            
+            // Update map with default dataset
+            await updateBaseLayer();
+        }
+        
+        // Render datasets list
+        renderDatasetsList(datasets);
+        
+        // Update breadcrumb
+        updateBreadcrumb();
     }
     
     console.log('✅ App initialization complete!');

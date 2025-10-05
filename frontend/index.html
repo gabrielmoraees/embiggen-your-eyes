@@ -30,13 +30,13 @@
         <div class="sheet-content">
             <!-- Quick Actions Bar -->
             <div class="quick-actions-bar">
-                <button class="action-btn" id="btn-bodies" title="Celestial Bodies">
+                <button class="action-btn" id="btn-bodies" title="Explore Subjects">
                     <span class="material-icons-round">public</span>
-                    <span class="action-label">Bodies</span>
+                    <span class="action-label">Explore</span>
                 </button>
-                <button class="action-btn" id="btn-layers" title="Layers">
+                <button class="action-btn" id="btn-layers" title="Datasets">
                     <span class="material-icons-round">layers</span>
-                    <span class="action-label">Layers</span>
+                    <span class="action-label">Datasets</span>
                 </button>
                 <button class="action-btn" id="btn-overlay" title="Overlay Layers">
                     <span class="material-icons-round">filter_none</span>
@@ -58,45 +58,50 @@
             
             <!-- Dynamic Content Area -->
             <div class="sheet-main" id="sheet-main">
-                <!-- Default: Bodies Selector -->
+                <!-- Default: Categories & Subjects Explorer -->
                 <div class="content-panel active" id="panel-bodies">
                     <h3 class="panel-title">Explore</h3>
-                    <div class="body-grid">
-                        <div class="body-card" data-body="earth">
-                            <div class="body-icon">🌍</div>
-                            <div class="body-name">Earth</div>
-                            <div class="body-desc">Live imagery</div>
-                        </div>
-                        <div class="body-card" data-body="mars">
-                            <div class="body-icon">🔴</div>
-                            <div class="body-name">Mars</div>
-                            <div class="body-desc">Red Planet</div>
-                        </div>
-                        <div class="body-card" data-body="moon">
-                            <div class="body-icon">🌕</div>
-                            <div class="body-name">Moon</div>
-                            <div class="body-desc">Lunar surface</div>
-                        </div>
-                        <div class="body-card" data-body="mercury">
-                            <div class="body-icon">☿️</div>
-                            <div class="body-name">Mercury</div>
-                            <div class="body-desc">MESSENGER</div>
-                        </div>
-                        <div class="body-card" data-body="custom">
-                            <div class="body-icon">📷</div>
-                            <div class="body-name">Custom</div>
-                            <div class="body-desc">Your images</div>
-                        </div>
+                    <div class="explore-desc">Browse by category and subject</div>
+                    <div id="categories-list" class="categories-list">
+                        <!-- Dynamically populated -->
                     </div>
                 </div>
                 
-                <!-- Layers Panel -->
+                <!-- Datasets Panel -->
                 <div class="content-panel" id="panel-layers">
-                    <h3 class="panel-title">Layers</h3>
+                    <div class="panel-header">
+                        <h3 class="panel-title">Datasets</h3>
+                        <div class="panel-breadcrumb" id="dataset-breadcrumb"></div>
+                    </div>
                     <div id="layers-list" class="layers-list"></div>
-                    <div class="date-picker-section" id="date-section">
-                        <label class="input-label">Date</label>
-                        <input type="date" id="date-picker" class="glass-input" />
+                    
+                    <!-- Variant Selector (shown when dataset selected) -->
+                    <div class="variant-section hidden" id="variant-section">
+                        <label class="input-label">Visualization</label>
+                        <div id="variant-selector" class="variant-grid"></div>
+                    </div>
+                    
+                    <!-- Date Picker (shown for time-series datasets) -->
+                    <div class="date-picker-section hidden" id="date-section">
+                        <label class="input-label">
+                            <span class="material-icons-round" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">event</span>
+                            Date 
+                            <span class="date-range-info" id="date-range-info"></span>
+                        </label>
+                        
+                        <!-- Quick date buttons -->
+                        <div class="date-quick-actions" id="date-quick-actions">
+                            <button class="date-quick-btn" data-offset="0" title="Today">Today</button>
+                            <button class="date-quick-btn" data-offset="-1" title="Yesterday">-1d</button>
+                            <button class="date-quick-btn" data-offset="-7" title="1 week ago">-1w</button>
+                            <button class="date-quick-btn" data-offset="-30" title="1 month ago">-1m</button>
+                        </div>
+                        
+                        <!-- Date input with wrapper for better styling -->
+                        <div class="date-input-wrapper">
+                            <span class="material-icons-round date-icon">calendar_today</span>
+                            <input type="date" id="date-picker" class="glass-input date-input" />
+                        </div>
                     </div>
                 </div>
                 
@@ -241,5 +246,10 @@
     
     <!-- Application JS -->
     <script src="app.js"></script>
+    
+    <!-- Attribution (hidden, for licensing compliance) -->
+    <div style="display: none;">
+        Icons made by Freepik, Smashicons, and iconixar from <a href="https://www.flaticon.com/">Flaticon</a>
+    </div>
 </body>
 </html>
