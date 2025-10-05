@@ -11,6 +11,7 @@ from typing import Dict, Optional, Tuple
 import hashlib
 from datetime import datetime
 import logging
+import threading
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -175,8 +176,129 @@ class TileProcessor:
             return 5  # Default fallback
         return max(int(d.name) for d in zoom_dirs)
     
+    def queue_processing(self, image_url: str, metadata: Dict):
+        """
+        Queue image processing in a background thread (non-blocking)
+        Returns immediately, processing happens asynchronously
+        """
+        tile_id = self._generate_tile_id(image_url)
+        
+        # Check if already processed or processing
+        if self.is_tiled(image_url):
+            logger.info(f"Image already tiled: {tile_id}")
+            return
+        
+        if tile_id in self.processing_status:
+            logger.info(f"Image already being processed: {tile_id}")
+            return
+        
+        # Mark as queued
+        self.processing_status[tile_id] = {
+            "status": "queued",
+            "queued_at": datetime.now().isoformat()
+        }
+        
+        # Start background thread
+        thread = threading.Thread(
+            target=self._process_image_background,
+            args=(image_url, metadata),
+            daemon=True
+        )
+        thread.start()
+        logger.info(f"Queued processing for {tile_id}")
+    
+    def _process_image_background(self, image_url: str, metadata: Dict):
+        """Background worker that processes the image"""
+        tile_id = self._generate_tile_id(image_url)
+        
+        try:
+            # Update processing status
+            self.processing_status[tile_id] = {
+                "status": "processing",
+                "started_at": datetime.now().isoformat(),
+                "progress": "downloading"
+            }
+            
+            # Step 1: Download image
+            image_path = self.download_image(image_url, tile_id)
+            
+            self.processing_status[tile_id]["progress"] = "generating_tiles"
+            
+            # Step 2: Generate tiles
+            tiles_dir, max_zoom = self.generate_tiles(image_path, tile_id)
+            
+            # Step 3: Update index
+            tile_info = {
+                "tile_id": tile_id,
+                "source_url": image_url,
+                "tiles_path": str(tiles_dir.relative_to(self.tiles_dir)),
+                "max_zoom": max_zoom,
+                "status": "completed",
+                "metadata": metadata,
+                "created_at": datetime.now().isoformat()
+            }
+            
+            self.tile_index[tile_id] = tile_info
+            self._save_tile_index()
+            
+            # Clear processing status
+            if tile_id in self.processing_status:
+                del self.processing_status[tile_id]
+            
+            logger.info(f"Processing completed for {tile_id}")
+            
+            # Update dataset status if dataset_id is in metadata
+            if "dataset_id" in metadata:
+                self._update_dataset_status(metadata["dataset_id"], "ready")
+            
+        except Exception as e:
+            logger.error(f"Processing failed for {tile_id}: {e}")
+            self.processing_status[tile_id] = {
+                "status": "failed",
+                "error": str(e),
+                "failed_at": datetime.now().isoformat()
+            }
+            
+            # Update dataset status if dataset_id is in metadata
+            if "dataset_id" in metadata:
+                self._update_dataset_status(metadata["dataset_id"], "failed")
+    
+    def _update_dataset_status(self, dataset_id: str, status: str):
+        """Update dataset status after processing completes"""
+        from app.data.storage import DATASETS
+        
+        if dataset_id in DATASETS:
+            dataset = DATASETS[dataset_id]
+            dataset.processing_status = status
+            dataset.updated_at = datetime.now()
+            
+            # Update tile URL if ready
+            if status == "ready" and hasattr(dataset, 'image_url'):
+                try:
+                    tile_url_template = self.get_tile_url_template(
+                        dataset.image_url,
+                        base_url="http://localhost:8000"
+                    )
+                    tile_id = self._generate_tile_id(dataset.image_url)
+                    thumbnail_url = f"http://localhost:8000/tiles/{tile_id}/0/0/0.png"
+                    
+                    # Update variant URLs
+                    if dataset.variants:
+                        dataset.variants[0].tile_url_template = tile_url_template
+                        dataset.variants[0].thumbnail_url = thumbnail_url
+                        
+                        # Update max_zoom from tile_info
+                        tile_info = self.tile_index.get(tile_id)
+                        if tile_info:
+                            dataset.variants[0].max_zoom = tile_info.get('max_zoom', 8)
+                    
+                    logger.info(f"Updated dataset {dataset_id} to ready status")
+                except Exception as e:
+                    logger.error(f"Failed to update dataset URLs: {e}")
+    
     def process_image(self, image_url: str, metadata: Dict) -> Dict:
         """
+        Synchronous processing (kept for backward compatibility)
         Main processing pipeline: download -> convert to tiles -> update index
         Returns tile information
         """

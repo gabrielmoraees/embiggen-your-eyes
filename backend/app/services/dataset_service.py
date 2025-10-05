@@ -133,36 +133,31 @@ class DatasetService:
         if tile_processor.is_tiled(image_url):
             tile_info = tile_processor.get_tile_info(image_url)
             status = "ready"
-        else:
-            # Start tile processing
-            metadata = {
-                "name": request.name,
-                "description": request.description or "",
-                "uploaded_at": datetime.now().isoformat()
-            }
-            
-            try:
-                tile_info = tile_processor.process_image(image_url, metadata)
-                status = "ready"
-            except Exception as e:
-                # Processing failed or in progress
-                status = "processing"
-                tile_info = {
-                    "tile_id": tile_id,
-                    "source_url": image_url,
-                    "status": "processing"
-                }
-        
-        # Get tile URL template
-        try:
             tile_url_template = tile_processor.get_tile_url_template(
                 image_url,
                 base_url="http://localhost:8000"
             )
             thumbnail_url = f"http://localhost:8000/tiles/{tile_info['tile_id']}/0/0/0.png"
-        except ValueError:
-            # Tiles not ready yet
-            tile_url_template = f"http://localhost:8000/api/tile-placeholder/{tile_info['tile_id']}"
+        else:
+            # Queue tile processing in background - don't wait for it
+            metadata = {
+                "name": request.name,
+                "description": request.description or "",
+                "uploaded_at": datetime.now().isoformat(),
+                "dataset_id": dataset_id
+            }
+            
+            # Start background processing (non-blocking)
+            tile_processor.queue_processing(image_url, metadata)
+            
+            status = "processing"
+            tile_info = {
+                "tile_id": tile_id,
+                "source_url": image_url,
+                "status": "processing"
+            }
+            # Tiles not ready yet - use placeholder
+            tile_url_template = f"http://localhost:8000/api/tile-placeholder/{tile_id}"
             thumbnail_url = tile_url_template
         
         # Create variant
