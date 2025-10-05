@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.api.routes import catalog, views, annotations, collections
+from app.api.routes import datasets
 from app.data.catalog import initialize_catalog
 
 
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
     
     # Include routers
     app.include_router(catalog.router, prefix="/api", tags=["catalog"])
+    app.include_router(datasets.router, prefix="/api/datasets", tags=["datasets"])
     app.include_router(views.router, prefix="/api", tags=["views"])
     app.include_router(annotations.router, prefix="/api", tags=["annotations"])
     app.include_router(collections.router, prefix="/api", tags=["collections"])

@@ -5,7 +5,7 @@ from typing import Dict, Any
 from datetime import datetime
 import uuid
 
-from app.models.schemas import Dataset, Variant, DatasetCreateRequest
+from app.models.schemas import Dataset, Variant, DatasetCreateRequest, DatasetUpdateRequest
 from app.models.enums import Category, Subject, SourceId, ProjectionType
 from app.data.storage import DATASETS
 from app.services.url_detector import detect_url_type, detect_source_from_url
@@ -204,4 +204,57 @@ class DatasetService:
             "tile_info": tile_info,
             "message": "Dataset created successfully" if status == "ready" else "Dataset created, processing tiles",
             "is_duplicate": False
+        }
+    
+    @staticmethod
+    def update_dataset(dataset_id: str, request: DatasetUpdateRequest) -> Dict[str, Any]:
+        """
+        Update an existing dataset's metadata
+        
+        Only allows updating metadata fields (name, description, category, subject).
+        Cannot update URL or tile-related fields.
+        Only custom datasets can be updated.
+        """
+        # Check if dataset exists
+        if dataset_id not in DATASETS:
+            return {
+                "success": False,
+                "error": f"Dataset not found: {dataset_id}"
+            }
+        
+        dataset = DATASETS[dataset_id]
+        
+        # Only allow updating custom datasets
+        if dataset.source_id != SourceId.CUSTOM:
+            return {
+                "success": False,
+                "error": "Only custom datasets can be updated"
+            }
+        
+        # Update fields if provided
+        updated = False
+        if request.name is not None:
+            dataset.name = request.name
+            updated = True
+        
+        if request.description is not None:
+            dataset.description = request.description
+            updated = True
+        
+        if request.category is not None:
+            dataset.category = request.category
+            updated = True
+        
+        if request.subject is not None:
+            dataset.subject = request.subject
+            updated = True
+        
+        if updated:
+            dataset.updated_at = datetime.now()
+        
+        return {
+            "success": True,
+            "dataset": dataset,
+            "dataset_id": dataset_id,
+            "message": "Dataset updated successfully" if updated else "No changes made"
         }

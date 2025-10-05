@@ -733,7 +733,6 @@ class TestCustomImageUploadWorkflow:
         print("✓ COMPLETE WORKFLOW SUCCESSFUL")
         print("=" * 60)
     
-    @pytest.mark.skip(reason="DELETE endpoint not yet implemented")
     @patch('app.services.dataset_service.tile_processor')
     def test_upload_and_delete_workflow(self, mock_processor, client: TestClient):
         """
@@ -863,88 +862,167 @@ class TestCustomImageUploadWorkflow:
         print("✓ MULTIPLE IMAGES WORKFLOW SUCCESSFUL")
         print("=" * 60)
     
-    @pytest.mark.skip(reason="Status polling endpoint not yet implemented")
-    @patch('app.services.dataset_service.tile_processor')
-    def test_processing_status_workflow(self, mock_processor, client: TestClient):
+    def test_dataset_status_endpoint(self, client: TestClient):
         """
-        E2E: Test tile processing status workflow
+        E2E: Test dataset status endpoint functionality
         
         Steps:
-        1. Upload image (starts processing)
-        2. Check processing status
-        3. Wait for completion
-        4. Verify tiles are ready
+        1. Check status of existing built-in dataset
+        2. Check status of non-existent dataset
+        3. Verify status endpoint structure
         """
         print("\n" + "=" * 60)
-        print("TILE PROCESSING STATUS WORKFLOW")
+        print("DATASET STATUS ENDPOINT TEST")
         print("=" * 60)
         
-        # Mock tile processor - initially processing
-        mock_processor.is_tiled.return_value = False
-        mock_processor._generate_tile_id.return_value = "test_status"
-        mock_processor.process_image.side_effect = Exception("Processing")
-        mock_processor.get_tile_url_template.side_effect = ValueError("Not ready")
-        
-        # Step 1: Upload image (triggers processing)
-        print("\n1. Upload image (triggers processing)...")
-        upload_response = client.post("/api/datasets", json={
-            "url": "https://example.com/large-image.jpg",
-            "name": "Large Image",
-            "category": "custom",
-            "subject": "custom"
-        })
-        
-        assert upload_response.status_code == 200
-        upload_data = upload_response.json()
-        
-        assert upload_data["status"] == "processing"
-        # Get dataset_id and extract tile_id from the mock
-        dataset_id = upload_data["dataset_id"]
-        tile_id = "test_status"  # This is what we set in the mock
-        print(f"   ✓ Upload initiated, status: processing")
-        print(f"   ✓ Dataset ID: {dataset_id}")
-        print(f"   ✓ Tile ID: {tile_id}")
-        
-        # Step 2: Check processing status
-        print("\n2. Check processing status...")
-        mock_processor.tile_index = {}
-        mock_processor.processing_status = {
-            tile_id: {
-                "status": "processing",
-                "progress": "generating_tiles",
-                "started_at": "2025-10-05T12:00:00"
-            }
-        }
-        
-        status_response = client.get(f"/api/tile-status/{tile_id}")
+        # Step 1: Check status of built-in dataset
+        print("\n1. Check status of built-in dataset...")
+        status_response = client.get("/api/datasets/viirs_snpp/status")
         
         assert status_response.status_code == 200
         status_data = status_response.json()
         
-        assert status_data["status"] == "processing"
-        print(f"   ✓ Status: {status_data['status']}")
-        print(f"   ✓ Progress: {status_data['progress']}")
-        
-        # Step 3: Simulate completion
-        print("\n3. Tiles complete processing...")
-        mock_processor.tile_index = {
-            tile_id: {
-                "tile_id": tile_id,
-                "status": "completed",
-                "max_zoom": 8
-            }
-        }
-        mock_processor.processing_status = {}
-        
-        status_response = client.get(f"/api/tile-status/{tile_id}")
-        
-        assert status_response.status_code == 200
-        status_data = status_response.json()
-        
+        assert "dataset_id" in status_data
+        assert "status" in status_data
+        assert status_data["dataset_id"] == "viirs_snpp"
         assert status_data["status"] == "ready"
-        print(f"   ✓ Status: {status_data['status']}")
-        print(f"   ✓ Tiles ready for use!")
+        print(f"   ✓ Built-in dataset status: {status_data['status']}")
+        
+        # Step 2: Check non-existent dataset
+        print("\n2. Check non-existent dataset...")
+        not_found_response = client.get("/api/datasets/nonexistent/status")
+        assert not_found_response.status_code == 404
+        print(f"   ✓ Returns 404 for non-existent dataset")
+        
+        # Step 3: Verify status endpoint for all datasets
+        print("\n3. Verify status endpoint works for all datasets...")
+        datasets_response = client.get("/api/datasets")
+        datasets = datasets_response.json()["datasets"]
+        
+        # Test a few datasets
+        tested = 0
+        for dataset in datasets[:3]:  # Test first 3
+            dataset_id = dataset["id"]
+            status_response = client.get(f"/api/datasets/{dataset_id}/status")
+            assert status_response.status_code == 200
+            status_data = status_response.json()
+            assert status_data["dataset_id"] == dataset_id
+            assert "status" in status_data
+            tested += 1
+        
+        print(f"   ✓ Tested {tested} datasets, all have working status endpoints")
         
         print("\n" + "=" * 60)
-        print("✓ PROCESSING STATUS WORKFLOW SUCCESSFUL")
+        print("✓ DATASET STATUS ENDPOINT TEST SUCCESSFUL")
+        print("=" * 60)
+    
+    def test_tile_service_dataset_workflow(self, client: TestClient):
+        """
+        E2E: Complete workflow for tile service dataset
+        
+        Steps:
+        1. User creates dataset from pre-tiled service (no processing needed)
+        2. Dataset is ready immediately
+        3. User can view dataset in catalog
+        4. User can get tile URLs
+        5. User can create a view with the dataset
+        """
+        print("\n" + "=" * 60)
+        print("TILE SERVICE DATASET WORKFLOW")
+        print("=" * 60)
+        
+        # Step 1: Create dataset from tile service URL
+        print("\n1. User creates dataset from tile service...")
+        create_response = client.post("/api/datasets", json={
+            "url": "https://tiles.example.com/mars/{z}/{x}/{y}.jpg",
+            "name": "Custom Mars Tiles",
+            "description": "Pre-tiled Mars imagery from external service",
+            "category": "planets",
+            "subject": "mars"
+        })
+        
+        assert create_response.status_code == 200
+        create_data = create_response.json()
+        
+        assert create_data["success"] is True
+        assert create_data["status"] == "ready"  # Should be ready immediately
+        dataset_id = create_data["dataset_id"]
+        print(f"   ✓ Dataset created: {dataset_id}")
+        print(f"   ✓ Status: {create_data['status']} (no processing needed)")
+        
+        # Step 2: Verify dataset in catalog
+        print("\n2. User finds dataset in catalog...")
+        catalog_response = client.get("/api/datasets")
+        catalog_data = catalog_response.json()
+        
+        dataset_ids = [d["id"] for d in catalog_data["datasets"]]
+        assert dataset_id in dataset_ids
+        print(f"   ✓ Dataset appears in catalog")
+        
+        # Step 3: Get dataset details
+        print("\n3. User gets dataset details...")
+        dataset_response = client.get(f"/api/datasets/{dataset_id}")
+        
+        assert dataset_response.status_code == 200
+        dataset = dataset_response.json()
+        
+        assert dataset["name"] == "Custom Mars Tiles"
+        assert dataset["category"] == "planets"
+        assert dataset["subject"] == "mars"
+        assert dataset["source_id"] == "custom"
+        assert len(dataset["variants"]) > 0
+        print(f"   ✓ Dataset: {dataset['name']}")
+        print(f"   ✓ Category: {dataset['category']}")
+        print(f"   ✓ Variants: {len(dataset['variants'])}")
+        
+        # Step 4: Get variant with tile URLs
+        print("\n4. User gets tile URLs...")
+        variant_response = client.get(f"/api/datasets/{dataset_id}/variants/default")
+        
+        assert variant_response.status_code == 200
+        variant_data = variant_response.json()
+        
+        variant = variant_data["variant"]
+        assert "{z}" in variant["tile_url"]
+        assert "{x}" in variant["tile_url"]
+        assert "{y}" in variant["tile_url"]
+        assert "tiles.example.com/mars" in variant["tile_url"]
+        print(f"   ✓ Tile URL: {variant['tile_url'][:60]}...")
+        
+        # Step 5: Create a saved view
+        print("\n5. User creates a saved view...")
+        view_response = client.post("/api/views", json={
+            "name": "My Mars Tile View",
+            "description": "View of custom Mars tiles",
+            "dataset_id": dataset_id,
+            "variant_id": "default",
+            "center_lat": 0.0,
+            "center_lng": 0.0,
+            "zoom_level": 5
+        })
+        
+        assert view_response.status_code == 200
+        view = view_response.json()
+        print(f"   ✓ View created: {view['name']}")
+        
+        # Step 6: Verify dataset can be filtered
+        print("\n6. User filters datasets by category...")
+        filter_response = client.get("/api/datasets?category=planets")
+        filter_data = filter_response.json()
+        
+        filtered_ids = [d["id"] for d in filter_data["datasets"]]
+        assert dataset_id in filtered_ids
+        print(f"   ✓ Dataset appears in filtered results")
+        
+        # Step 7: Check status (should be ready)
+        print("\n7. User checks dataset status...")
+        status_response = client.get(f"/api/datasets/{dataset_id}/status")
+        
+        assert status_response.status_code == 200
+        status_data = status_response.json()
+        assert status_data["status"] == "ready"
+        print(f"   ✓ Status: {status_data['status']}")
+        
+        print("\n" + "=" * 60)
+        print("✓ TILE SERVICE DATASET WORKFLOW SUCCESSFUL")
         print("=" * 60)

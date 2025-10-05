@@ -142,3 +142,11 @@ class DatasetCreateRequest(BaseModel):
     category: Category
     subject: Subject
     url: str  # Can be tile service URL or image URL
+
+
+class DatasetUpdateRequest(BaseModel):
+    """Request to update an existing dataset"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[Category] = None
+    subject: Optional[Subject] = None
