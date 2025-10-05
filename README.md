@@ -2,6 +2,10 @@
 
 **NASA Space Apps Challenge 2025** - A platform for exploring, analyzing, and annotating NASA satellite imagery across multiple celestial bodies with Google Maps-like functionality.
 
+## 🎥 Recording
+
+Watch the platform in action: [`zoomers-demo.mov`](https://drive.google.com/file/d/1HS7US5JPdMJ_2vWv7KcxZhfVCP6viNi8/view?usp=share_link)
+
 ## 🌐 Live Demo
 
 **Try it now!** The application is deployed and ready to use:
@@ -15,6 +19,10 @@
 ## 🎯 Project Overview
 
 A comprehensive platform for exploring, analyzing, and annotating satellite imagery with interactive mapping and data management capabilities.
+
+## 🎥 Demo
+
+Watch the platform in action: [`zoomers-demo.mov`](./zoomers-demo.mov)
 
 ## 🌌 Data Structure
 
