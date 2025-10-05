@@ -2,6 +2,16 @@
 
 **NASA Space Apps Challenge 2025** - A platform for exploring, analyzing, and annotating NASA satellite imagery across multiple celestial bodies with Google Maps-like functionality.
 
+## 🌐 Live Demo
+
+**Try it now!** The application is deployed and ready to use:
+
+- 🚀 **Frontend**: [https://embiggen-frontend-e5afykj55q-uc.a.run.app](https://embiggen-frontend-e5afykj55q-uc.a.run.app)
+- 🔧 **Backend API**: [https://embiggen-backend-e5afykj55q-uc.a.run.app](https://embiggen-backend-e5afykj55q-uc.a.run.app)
+- 📚 **API Documentation**: [https://embiggen-backend-e5afykj55q-uc.a.run.app/docs](https://embiggen-backend-e5afykj55q-uc.a.run.app/docs)
+
+**Deployed on Google Cloud Run** with auto-scaling infrastructure and HTTPS enabled.
+
 ## 🎯 Project Overview
 
 A comprehensive platform for exploring, analyzing, and annotating satellite imagery with interactive mapping and data management capabilities.
