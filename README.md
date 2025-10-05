@@ -51,7 +51,7 @@ open http://localhost:8000/docs
 
 Comprehensive REST API for imagery management and analysis.
 
-📖 **Full documentation**: `backend/ARCHITECTURE.md` and `backend/CUSTOM_IMAGES.md`
+📖 **Documentation**: `backend/ARCHITECTURE.md` and `backend/DATASET_IMPORT.md`
 
 ### Frontend (Vanilla JS + Leaflet)
 
@@ -185,7 +185,10 @@ See LICENSE file.
 
 ## 📞 Documentation
 
-API docs at `http://localhost:8000/docs` • Architecture guide in `backend/ARCHITECTURE.md`
+- **API Documentation**: `http://localhost:8000/docs` (interactive Swagger UI)
+- **Architecture Guide**: `backend/ARCHITECTURE.md` - System design and structure
+- **Dataset Import Guide**: `backend/DATASET_IMPORT.md` - Import custom images with async processing
+- **Testing Guide**: `backend/tests/README.md` - Comprehensive test suite
 
 ---
 

@@ -85,14 +85,21 @@ Code is organized by feature rather than by technical layer, making it easier to
 4. **Reusability**: Services can be reused across different API endpoints
 5. **Flexibility**: Easy to swap implementations (e.g., replace in-memory storage with database)
 
+## Related Documentation
+
+- **`DATASET_IMPORT.md`**: Complete guide for importing custom images with async processing
+- **`tests/README.md`**: Comprehensive testing guide
+- **API Docs**: `http://localhost:8000/docs` (interactive Swagger UI)
+
 ## Future Enhancements
 
 Potential improvements include:
-- Database integration for persistent storage
+- Database integration for persistent storage (currently in-memory)
 - Caching layer for improved performance
 - Authentication and authorization
-- Background task processing
+- Enhanced background task processing with queues
 - Event-driven architecture
 - API versioning strategy
 - Rate limiting and throttling
 - Enhanced logging and monitoring
+- WebSocket support for real-time progress updates
