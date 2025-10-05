@@ -8,9 +8,9 @@ from .storage import SOURCES, DATASETS
 
 
 def initialize_catalog():
-    """Initialize the catalog with all available maps, sources, and layers"""
+    """Initialize the catalog with all available datasets, sources, and layers"""
     
-    # ========== MAP SOURCES ==========
+    # ========== DATA SOURCES ==========
     SOURCES[SourceId.NASA_GIBS] = Source(
         id=SourceId.NASA_GIBS,
         name="NASA GIBS",
@@ -58,7 +58,7 @@ def initialize_catalog():
     
     # ========== EARTH DATASETS ==========
     
-    # VIIRS SNPP Map
+    # VIIRS SNPP Dataset
     DATASETS["viirs_snpp"] = Dataset(
         id="viirs_snpp",
         name="VIIRS SNPP",
@@ -91,7 +91,7 @@ def initialize_catalog():
         ]
     )
     
-    # MODIS Terra Map
+    # MODIS Terra Dataset
     DATASETS["modis_terra"] = Dataset(
         id="modis_terra",
         name="MODIS Terra",
@@ -194,7 +194,7 @@ def initialize_catalog():
         ]
     )
     
-    # Moon USGS Geologic Map
+    # Moon USGS Geologic Dataset
     DATASETS["moon_usgs_geologic"] = Dataset(
         id="moon_usgs_geologic",
         name="Unified Geologic Map",

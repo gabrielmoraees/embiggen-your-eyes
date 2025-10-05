@@ -12,7 +12,7 @@ The application uses a hierarchical catalog system:
 
 - **Categories**: High-level groupings (Planets, Moons, Galaxies, Nebulae, etc.)
 - **Subjects**: Specific celestial objects (Earth, Mars, Moon, Mercury, etc.)
-- **Datasets**: Specific map products from data providers (e.g., "VIIRS SNPP", "Mars Viking")
+- **Datasets**: Specific data products from providers (e.g., "VIIRS SNPP", "Mars Viking")
 - **Variants**: Visualization variants of datasets (True Color, False Color, etc.)
 - **Sources**: Data providers (NASA GIBS, NASA Trek, OpenPlanetaryMap, USGS, Custom)
 
@@ -98,8 +98,8 @@ Interactive map viewer with mobile-friendly Material Design UI. Core features co
 - **Multi-Subject Exploration**: Browse datasets across planets, moons, and custom imagery
 - **Dataset Variants**: Multiple visualization modes (True Color, False Color, etc.)
 - **Time-Series Support**: View Earth datasets across different dates
-- **Interactive Annotations**: Add markers, paths, rectangles, and circles directly on the map
-- **Views**: Save and restore complete map configurations
+- **Interactive Annotations**: Add markers, paths, rectangles, and circles directly on datasets
+- **Views**: Save and restore complete view configurations
 - **Collections**: Organize multiple views into thematic collections
 - **iOS-Inspired UI**: Glassmorphism design with adaptive bottom sheet navigation
 
@@ -158,7 +158,7 @@ Supports environmental monitoring, planetary science research, and comparative a
 2. **Flexible Data Model**: Clean separation between catalog data, user views, and annotations
 3. **Mobile-First Design**: iOS-inspired interface with adaptive bottom sheet navigation
 4. **Multi-Source Integration**: Seamlessly combines data from NASA GIBS, Trek, OpenPlanetaryMap, USGS, and custom uploads
-5. **Interactive Annotation Tools**: Direct map interaction for adding markers, paths, and shapes with default naming and inline editing
+5. **Interactive Annotation Tools**: Direct interaction for adding markers, paths, and shapes with default naming and inline editing
 
 ## 🏆 NASA Space Apps Challenge 2025
 

@@ -35,7 +35,7 @@ class Layer(BaseModel):
 
 
 class Variant(BaseModel):
-    """Visualization variant of a map (true color, false color, etc.)"""
+    """Visualization variant of a dataset (true color, false color, etc.)"""
     id: str
     name: str
     description: str
@@ -47,7 +47,7 @@ class Variant(BaseModel):
 
 
 class Dataset(BaseModel):
-    """A specific dataset/map product from a source"""
+    """A specific dataset product from a source"""
     id: str
     name: str
     description: str
@@ -67,7 +67,7 @@ class Dataset(BaseModel):
 
 
 class View(BaseModel):
-    """User-saved map configuration"""
+    """User-saved view configuration"""
     id: Optional[str] = None
     name: str
     description: Optional[str] = None
@@ -115,7 +115,7 @@ class LinkTarget(BaseModel):
 
 
 class Annotation(BaseModel):
-    """Map annotation (point, polygon, text, or link)"""
+    """Dataset annotation (point, polygon, text, or link)"""
     id: Optional[str] = None
     map_view_id: Optional[str] = None  # Link to View
     type: AnnotationType
@@ -139,7 +139,7 @@ class Annotation(BaseModel):
 
 
 class ImageLink(BaseModel):
-    """Link between map views"""
+    """Link between dataset views"""
     id: Optional[str] = None
     source_view_id: str
     target_view_id: str
@@ -150,7 +150,7 @@ class ImageLink(BaseModel):
 
 
 class Collection(BaseModel):
-    """Collection of map views"""
+    """Collection of dataset views"""
     id: Optional[str] = None
     name: str
     description: Optional[str] = None
