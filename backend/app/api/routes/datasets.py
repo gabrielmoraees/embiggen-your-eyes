@@ -195,3 +195,4 @@ def get_dataset_variant(dataset_id: str, variant_id: str, date_param: Optional[d
     if not result:
         raise HTTPException(status_code=404, detail=f"Dataset or variant not found")
     return result
+
